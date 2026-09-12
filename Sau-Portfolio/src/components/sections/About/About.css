@@ -1,0 +1,125 @@
+/*  ABOUT — storytelling section  */
+
+.about-about {
+  position: relative;
+  background: var(--bg);
+}
+
+.about-wrap {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 120px 44px 130px;
+}
+
+/* ---------- header ---------- */
+.about-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 26px;
+}
+
+.about-eyebrow span {
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.about-eyebrow::after {
+  content: "";
+  flex: 0 0 34px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.about-h2 {
+  font-weight: 900;
+  font-size: clamp(36px, 4.6vw, 62px);
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+.about-serif {
+  font-family: var(--font-serif), Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+/* ---------- metrics band ---------- */
+.about-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+  margin-top: 84px;
+}
+
+.about-metric {
+  border-top: 2px solid var(--chrome);
+  padding-top: 20px;
+}
+
+.about-metric-num {
+  display: flex;
+  align-items: baseline;
+  font-size: clamp(34px, 3.6vw, 50px);
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.about-metric-num i {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.about-metric-static {
+  font-weight: 900;
+}
+
+.about-metric-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
+  margin-top: 10px;
+  line-height: 1.45;
+  max-width: 220px;
+}
+
+/* ---------- education + next ---------- */
+.about-edu {
+  margin-top: 56px;
+  font-size: 14.5px;
+  color: var(--ink-2);
+}
+
+.about-edu b {
+  color: var(--ink);
+}
+
+.about-next {
+  margin-top: 34px;
+}
+
+/*  Responsive  */
+@media (max-width: 1100px) {
+  .about-wrap {
+    padding: 90px 24px 100px;
+  }
+
+  .about-metrics {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 34px 24px;
+    margin-top: 64px;
+  }
+}
+
+@media (max-width: 560px) {
+  .about-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+}

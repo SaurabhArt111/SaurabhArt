@@ -1,0 +1,217 @@
+/*  LET'S CONNECT — the closing chapter  */
+
+.conn-connect {
+  position: relative;
+  background: var(--bg);
+  overflow: hidden;
+  padding: 130px 0 0;
+}
+
+.conn-head {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 0 24px;
+  position: relative;
+  z-index: 4;
+}
+
+.conn-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.conn-eyebrow span {
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.conn-h2 {
+  margin-top: 18px;
+  font-weight: 900;
+  font-size: clamp(42px, 6.4vw, 92px);
+  letter-spacing: -0.035em;
+  line-height: 1.0;
+}
+
+.conn-serif {
+  font-family: var(--font-serif), Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.conn-lede {
+  margin: 20px auto 0;
+  max-width: 480px;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.conn-cta {
+  margin-top: 28px;
+  display: flex;
+  justify-content: center;
+}
+
+/* ---------- social cards ---------- */
+.conn-socials {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 96px auto 0;
+  padding: 0 24px;
+  position: relative;
+  z-index: 4;
+}
+
+.conn-social {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
+  border-radius: 999px;
+  background: var(--glass-bg-strong);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 28px -12px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  overflow: hidden;
+  isolation: isolate;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  transition: color 0.3s ease, border-color 0.3s ease;
+}
+
+/* same interaction standard as nav links & Button: circle fill + label roll */
+.conn-social::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 240%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--chrome);
+  transform: translate(-50%, 0) scale(0);
+  transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1);
+  z-index: -1;
+}
+
+.conn-social:hover::before {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.conn-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--ink);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.conn-social:hover .conn-glyph {
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--chrome-fg);
+}
+
+/* official brand marks (LinkedIn / GitHub / Instagram) — currentColor SVGs,
+   so the circle-fill hover inverts them exactly like the text glyphs */
+.conn-glyph svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+
+.conn-roll {
+  display: inline-block;
+  overflow: hidden;
+  height: 1.3em;
+  line-height: 1.3;
+}
+
+.conn-roll span {
+  display: block;
+  transition: transform 0.4s cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+.conn-social:hover .conn-roll span {
+  transform: translateY(-100%);
+}
+
+.conn-roll span:last-child {
+  color: var(--chrome-fg);
+}
+
+.conn-arrow {
+  display: inline-flex;
+  font-size: 12px;
+  transition: transform 0.4s var(--ease-out-expo), color 0.3s ease;
+}
+
+.conn-social:hover .conn-arrow {
+  transform: translate(2px, -2px);
+  color: var(--chrome-fg);
+}
+
+/* ---------- footer ---------- */
+.conn-footer {
+  margin-top: 96px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  max-width: var(--max);
+  margin-left: auto;
+  margin-right: auto;
+  padding: 26px 44px 30px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.conn-footer b {
+  color: var(--ink);
+}
+
+.conn-top {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  color: var(--ink-2);
+  transition: color 0.25s ease;
+}
+
+.conn-top:hover {
+  color: var(--accent);
+}
+
+/* ---------- responsive ---------- */
+@media (max-width: 1000px) {
+  .conn-connect {
+    padding-top: 100px;
+  }
+
+  .conn-footer {
+    flex-direction: column;
+    text-align: center;
+    padding: 24px;
+  }
+}

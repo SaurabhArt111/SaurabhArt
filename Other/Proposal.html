@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A Question For You</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;1,600&family=Poppins:wght@300;400;500;600&display=swap');
+
+  :root {
+    --midnight: #150c2e;
+    --midnight-deep: #0a0618;
+    --blush: #f3c6cf;
+    --rose-gold: #e0a878;
+    --gold: #f0cd8a;
+    --mist: #d6cdf0;
+    --violet: #7c5cff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    height: 100%;
+    overflow: hidden; /* never let the roaming button create scroll / extra page height */
+  }
+  body {
+    background: var(--midnight-deep);
+    color: var(--mist);
+    font-family: 'Poppins', sans-serif;
+    position: relative;
+  }
+
+  /* ---------- animated gradient backdrop ---------- */
+  #bg {
+    position: fixed;
+    inset: -10%;
+    z-index: 0;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(124,92,255,0.35), transparent 45%),
+      radial-gradient(circle at 80% 30%, rgba(224,168,120,0.25), transparent 40%),
+      radial-gradient(circle at 50% 85%, rgba(243,198,207,0.22), transparent 45%),
+      linear-gradient(160deg, var(--midnight) 0%, var(--midnight-deep) 70%);
+    background-size: 200% 200%;
+    animation: drift 18s ease-in-out infinite;
+    filter: blur(20px);
+  }
+  @keyframes drift {
+    0%   { background-position: 0% 0%; }
+    50%  { background-position: 100% 60%; }
+    100% { background-position: 0% 0%; }
+  }
+
+  canvas#fx {
+    position: fixed;
+    inset: 0;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  #stars { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+  .star {
+    position: absolute;
+    width: 2px; height: 2px;
+    background: var(--mist);
+    border-radius: 50%;
+    opacity: 0.5;
+    animation: twinkle 3.2s ease-in-out infinite;
+  }
+  @keyframes twinkle { 0%,100% { opacity:.12 } 50% { opacity:.9 } }
+
+  /* ambient floating hearts, always drifting */
+  .drift-heart {
+    position: fixed;
+    bottom: -60px;
+    z-index: 2;
+    pointer-events: none;
+    opacity: 0;
+    animation: floatUp linear forwards;
+    filter: drop-shadow(0 0 6px rgba(243,198,207,0.5));
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: 0.8; }
+    90%  { opacity: 0.6; }
+    100% { transform: translateY(-105vh) translateX(var(--drift, 40px)) rotate(20deg); opacity: 0; }
+  }
+
+  .center-wrap {
+    position: relative;
+    z-index: 4;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 20px;
+  }
+
+  .card {
+    position: relative;
+    width: 100%;
+    max-width: 560px;
+    padding: 56px 40px;
+    text-align: center;
+    background: rgba(255,255,255,0.045);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 28px;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 30px 90px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08);
+    animation: cardIn 1s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(24px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: 28px;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(240,205,138,0.5), rgba(124,92,255,0.15), rgba(243,198,207,0.4));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.4em;
+    text-transform: uppercase;
+    color: var(--rose-gold);
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-weight: 700;
+    font-size: clamp(2.1rem, 6vw, 3.2rem);
+    line-height: 1.15;
+    margin-bottom: 18px;
+    background: linear-gradient(100deg, #fdf6f0 20%, var(--gold) 45%, var(--blush) 65%, #fdf6f0 85%);
+    background-size: 220% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: shine 5s linear infinite;
+  }
+  @keyframes shine {
+    to { background-position: -220% center; }
+  }
+  h1 em { font-style: italic; }
+
+  .subtext {
+    font-size: 1rem;
+    font-weight: 300;
+    line-height: 1.75;
+    max-width: 440px;
+    margin: 0 auto 46px;
+    opacity: 0.85;
+  }
+
+  .btn-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+  }
+
+  button {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 999px;
+    padding: 16px 40px;
+    cursor: pointer;
+    transition: box-shadow 0.15s ease;
+  }
+
+  #yes-btn {
+    background: linear-gradient(135deg, var(--gold), var(--rose-gold));
+    color: #241536;
+    box-shadow: 0 8px 26px rgba(224,168,120,0.4);
+    animation: pulseGlow 2.4s ease-in-out infinite;
+    position: relative;
+    z-index: 10;
+    transition: box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  @keyframes pulseGlow {
+    0%,100% { box-shadow: 0 8px 26px rgba(224,168,120,0.4); }
+    50%     { box-shadow: 0 8px 40px rgba(240,205,138,0.7); }
+  }
+  #yes-btn:hover { transform: translateY(-2px) scale(1.05); }
+  #yes-btn:active { transform: scale(0.96); }
+
+  #no-btn {
+    background: rgba(255,255,255,0.06);
+    color: var(--mist);
+    border: 1.5px solid rgba(214,205,240,0.35);
+    z-index: 9;
+    --s: 1;
+    transform: scale(var(--s));
+  }
+  #no-btn.roaming {
+    position: fixed;
+    left: 34px;
+    top: 34px;
+    /* smooth, bouncy travel between spots */
+    transition: left 0.55s cubic-bezier(.34, 1.56, .64, 1),
+                top 0.55s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  #no-btn:hover { background: rgba(255,255,255,0.1); }
+
+  /* the "hop" flourish that plays every time it relocates — kept modest so the
+     peak of the motion never crosses the viewport edge */
+  @keyframes hop {
+    0%   { transform: scale(var(--s)) rotate(0deg) translateY(0); }
+    22%  { transform: scale(calc(var(--s) * 0.92), calc(var(--s) * 1.08)) rotate(-5deg) translateY(1px); }
+    50%  { transform: scale(calc(var(--s) * 1.06), calc(var(--s) * 0.94)) rotate(4deg) translateY(-7px); }
+    75%  { transform: scale(calc(var(--s) * 0.97), calc(var(--s) * 1.03)) rotate(-2deg) translateY(1px); }
+    100% { transform: scale(var(--s)) rotate(0deg) translateY(0); }
+  }
+  #no-btn.hopping {
+    animation: hop 0.55s cubic-bezier(.3, .7, .4, 1);
+  }
+
+  .hint {
+    margin-top: 30px;
+    font-size: 0.8rem;
+    color: rgba(214,205,240,0.5);
+    font-style: italic;
+    min-height: 18px;
+  }
+
+  /* ---------- YES PAGE ---------- */
+  #page-yes { display: none; }
+  .heart-icon {
+    font-size: 3.2rem;
+    display: inline-block;
+    margin-bottom: 20px;
+    animation: pulseHeart 1.2s ease-in-out infinite;
+  }
+  @keyframes pulseHeart {
+    0%,100% { transform: scale(1); }
+    50%     { transform: scale(1.22); }
+  }
+  .celebrate-sub {
+    font-size: 1.05rem;
+    margin-top: 8px;
+    opacity: 0.9;
+  }
+
+  @media (max-width: 480px) {
+    .card { padding: 44px 24px; }
+    button { padding: 14px 30px; font-size: 0.92rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="bg"></div>
+<div id="stars"></div>
+<canvas id="fx"></canvas>
+
+<div class="center-wrap">
+
+  <!-- ============ PAGE 1 : THE ASK ============ -->
+  <div class="card" id="page-ask">
+    <div class="eyebrow">For You, Only You</div>
+    <h1>Will you be my <em>girlfriend</em>?</h1>
+    <p class="subtext">
+      I've thought about how to say this a hundred different ways, and it always
+      comes back to something simple. I like you. I like us. So — what do you say?
+    </p>
+
+    <div class="btn-row">
+      <button id="yes-btn" onclick="goToYes()">Accept 💛</button>
+      <button id="no-btn">Reject</button>
+    </div>
+
+    <p class="hint" id="hint">psst — that second button doesn't want to be caught</p>
+  </div>
+
+  <!-- ============ PAGE 2 : SHE SAID YES ============ -->
+  <div class="card" id="page-yes">
+    <div class="heart-icon">💖</div>
+    <h1>She said yes.</h1>
+    <p class="celebrate-sub">Best decision either of us has made all year. Here's to us. ✨</p>
+  </div>
+
+</div>
+
+<script>
+  /* ---------- ambient stars ---------- */
+  const starsContainer = document.getElementById('stars');
+  for (let i = 0; i < 70; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    s.style.left = Math.random() * 100 + 'vw';
+    s.style.top = Math.random() * 100 + 'vh';
+    s.style.animationDelay = (Math.random() * 3.2) + 's';
+    starsContainer.appendChild(s);
+  }
+
+  /* ---------- ambient drifting hearts ---------- */
+  const heartGlyphs = ['💜','💛','✨','💫'];
+  function spawnDriftHeart() {
+    const el = document.createElement('div');
+    el.className = 'drift-heart';
+    el.textContent = heartGlyphs[Math.floor(Math.random() * heartGlyphs.length)];
+    const size = 12 + Math.random() * 16;
+    el.style.fontSize = size + 'px';
+    el.style.left = Math.random() * 100 + 'vw';
+    el.style.setProperty('--drift', (Math.random() * 120 - 60) + 'px');
+    const duration = 9 + Math.random() * 8;
+    el.style.animationDuration = duration + 's';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), duration * 1000 + 200);
+  }
+  setInterval(spawnDriftHeart, 550);
+  for (let i = 0; i < 6; i++) setTimeout(spawnDriftHeart, i * 300);
+
+  /* ---------- reject button: roams the whole viewport, never touches Accept ---------- */
+  const noBtn = document.getElementById('no-btn');
+  const yesBtn = document.getElementById('yes-btn');
+  const card = document.getElementById('page-ask');
+  const hint = document.getElementById('hint');
+
+  const excuses = [
+    "nice try 😏",
+    "nope, not happening",
+    "she's not clicking that",
+    "keep trying, I dare you",
+    "you can't catch me",
+    "wrong answer, try again",
+    "this button doesn't work anyway",
+    "getting warmer... just kidding, colder",
+    "the only right answer is Accept 💛"
+  ];
+  let dodgeCount = 0;
+  let isRoaming = false;
+
+  function rectsOverlap(a, b, pad) {
+    return !(a.right + pad < b.left ||
+             a.left - pad > b.right ||
+             a.bottom + pad < b.top ||
+             a.top - pad > b.bottom);
+  }
+
+  const EDGE_MARGIN = 12; // visual resting margin from the edge
+  const ANIM_OVERSHOOT = 22; // extra buffer absorbing the hop's rotate/scale/lift bulge
+  const SAFE_MARGIN = EDGE_MARGIN + ANIM_OVERSHOOT;
+
+  function pickSafeSpot(pointer) {
+    const w = noBtn.offsetWidth || 140;
+    const h = noBtn.offsetHeight || 52;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const cardRect = card.getBoundingClientRect();
+
+    const maxX = Math.max(vw - w - SAFE_MARGIN * 2, 0);
+    const maxY = Math.max(vh - h - SAFE_MARGIN * 2, 0);
+
+    let best = null;
+    let bestScore = -1;
+
+    for (let i = 0; i < 40; i++) {
+      const x = SAFE_MARGIN + Math.random() * maxX;
+      const y = SAFE_MARGIN + Math.random() * maxY;
+      const candidate = { left: x, top: y, right: x + w, bottom: y + h };
+
+      if (rectsOverlap(candidate, cardRect, 24)) continue;
+
+      let score = 0;
+      if (pointer) {
+        const cx = x + w / 2, cy = y + h / 2;
+        score = Math.hypot(cx - pointer.x, cy - pointer.y);
+      } else {
+        score = Math.random();
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = { x, y };
+      }
+    }
+
+    // fallback: corner farthest from card center if nothing found
+    if (!best) {
+      const cardCenter = { x: cardRect.left + cardRect.width / 2, y: cardRect.top + cardRect.height / 2 };
+      const corners = [
+        { x: SAFE_MARGIN, y: SAFE_MARGIN },
+        { x: SAFE_MARGIN + maxX, y: SAFE_MARGIN },
+        { x: SAFE_MARGIN, y: SAFE_MARGIN + maxY },
+        { x: SAFE_MARGIN + maxX, y: SAFE_MARGIN + maxY }
+      ];
+      corners.sort((a, b) =>
+        Math.hypot(b.x - cardCenter.x, b.y - cardCenter.y) - Math.hypot(a.x - cardCenter.x, a.y - cardCenter.y)
+      );
+      best = corners[0];
+    }
+
+    // clamp defensively so it (and its hop bulge) can never cross the viewport edge
+    best.x = Math.min(Math.max(best.x, SAFE_MARGIN), SAFE_MARGIN + maxX);
+    best.y = Math.min(Math.max(best.y, SAFE_MARGIN), SAFE_MARGIN + maxY);
+
+    return best;
+  }
+
+  function dodge(pointer) {
+    dodgeCount++;
+    if (!isRoaming) {
+      // IMPORTANT: .card has a transform (from its entrance animation), and any
+      // ancestor with a transform becomes the containing block for `position: fixed`
+      // children. Reparent to <body> so "fixed" is relative to the real viewport,
+      // not the card — otherwise the button can appear to leave the visible screen.
+      document.body.appendChild(noBtn);
+      noBtn.classList.add('roaming');
+      isRoaming = true;
+    }
+
+    const spot = pickSafeSpot(pointer);
+    noBtn.style.left = spot.x + 'px';
+    noBtn.style.top = spot.y + 'px';
+
+    // persistent shrink is stored in --s, kept separate from the hop keyframe's transform
+    const scale = Math.max(0.7, 1 - dodgeCount * 0.02);
+    noBtn.style.setProperty('--s', scale);
+
+    // replay the hop flourish every time it relocates
+    noBtn.classList.remove('hopping');
+    void noBtn.offsetWidth; // force reflow so the animation restarts
+    noBtn.classList.add('hopping');
+
+    hint.textContent = excuses[Math.min(dodgeCount - 1, excuses.length - 1)];
+  }
+
+  // click/touch on the button itself always dodges
+  noBtn.addEventListener('click', (e) => { e.preventDefault(); dodge(); });
+  noBtn.addEventListener('touchstart', (e) => { e.preventDefault(); dodge(); }, { passive: false });
+
+  // desktop: dodge whenever the cursor gets close, before it can even hover-click
+  const DODGE_RADIUS = 110;
+  document.addEventListener('mousemove', (e) => {
+    if (document.getElementById('page-ask').style.display === 'none') return;
+    const r = noBtn.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
+    if (dist < DODGE_RADIUS) dodge({ x: e.clientX, y: e.clientY });
+  });
+
+  // mobile: dodge as soon as a touch is anywhere near it
+  document.addEventListener('touchmove', (e) => {
+    if (document.getElementById('page-ask').style.display === 'none') return;
+    const t = e.touches[0];
+    if (!t) return;
+    const r = noBtn.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const dist = Math.hypot(t.clientX - cx, t.clientY - cy);
+    if (dist < DODGE_RADIUS + 30) dodge({ x: t.clientX, y: t.clientY });
+  }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    if (isRoaming) dodge();
+  });
+
+  /* ---------- go to acceptance page ---------- */
+  function goToYes() {
+    document.getElementById('page-ask').style.display = 'none';
+    document.getElementById('page-yes').style.display = 'block';
+    startFireworks();
+  }
+
+  /* ---------- canvas fireworks + confetti ---------- */
+  const canvas = document.getElementById('fx');
+  const ctx = canvas.getContext('2d');
+  function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resizeCanvas();
+  window.addEventListener('resize', resizeCanvas);
+
+  const colors = ['#f0cd8a', '#e0a878', '#f3c6cf', '#d6cdf0', '#7c5cff'];
+  let particles = [];
+  let fxRunning = false;
+
+  function burst(x, y, count = 55) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 2 + Math.random() * 6;
+      particles.push({
+        x, y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        gravity: 0.10 + Math.random() * 0.05,
+        life: 0,
+        maxLife: 60 + Math.random() * 40,
+        size: 2 + Math.random() * 3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        shape: Math.random() < 0.5 ? 'rect' : 'circle',
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.3
+      });
+    }
+  }
+
+  function confettiRain(count = 90) {
+    for (let i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * 200,
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: 2 + Math.random() * 2.5,
+        gravity: 0.02,
+        life: 0,
+        maxLife: 260 + Math.random() * 120,
+        size: 3 + Math.random() * 3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        shape: Math.random() < 0.5 ? 'rect' : 'circle',
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.2
+      });
+    }
+  }
+
+  function animateFx() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.life++;
+      p.vy += p.gravity;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rotation += p.rotSpeed;
+
+      const lifeRatio = p.life / p.maxLife;
+      const alpha = Math.max(0, 1 - lifeRatio);
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.fillStyle = p.color;
+      if (p.shape === 'rect') {
+        ctx.fillRect(-p.size, -p.size * 1.6, p.size * 2, p.size * 3.2);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+
+    particles = particles.filter(p => p.life < p.maxLife && p.y < canvas.height + 40);
+
+    if (fxRunning) requestAnimationFrame(animateFx);
+    else if (particles.length) requestAnimationFrame(animateFx);
+  }
+
+  function startFireworks() {
+    fxRunning = true;
+    animateFx();
+
+    confettiRain(120);
+
+    const centerBursts = () => {
+      burst(canvas.width * (0.25 + Math.random() * 0.5), canvas.height * (0.25 + Math.random() * 0.35), 70);
+    };
+    centerBursts();
+    let n = 0;
+    const iv = setInterval(() => {
+      centerBursts();
+      confettiRain(35);
+      n++;
+      if (n >= 6) {
+        clearInterval(iv);
+        setTimeout(() => { fxRunning = false; }, 500);
+      }
+    }, 900);
+  }
+</script>
+
+</body>
+</html>

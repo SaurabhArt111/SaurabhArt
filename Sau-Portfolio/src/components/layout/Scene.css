@@ -1,0 +1,83 @@
+/*  SCENE — stacked full-screen frames  */
+
+.scene-hold {
+  position: sticky;
+  top: 0;
+  height: 100svh;
+  /* Opaque: a rising scene must fully occlude the one behind it. */
+  background: var(--bg, #fff);
+  /* keeps a section's internal z-indexes from escaping into the scene stack */
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* the section fills its frame */
+.scene-hold>* {
+  height: 100%;
+}
+
+/* pure scroll distance for a scene's interior — paints nothing */
+.scene-runway {
+  position: relative;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/*  MOBILE  */
+@media (max-width: 1000px) {
+  .scene-hold {
+    position: static;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    isolation: auto;
+  }
+
+  .scene-hold>* {
+    height: auto;
+  }
+
+  .scene-runway {
+    display: none;
+  }
+
+  /* full-screen-on-mobile scenes keep their frame */
+  .scene-keep-frame {
+    position: sticky;
+    top: 0;
+    height: 100svh;
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .scene-keep-frame>* {
+    height: 100%;
+  }
+
+  .scene-keep-runway {
+    display: block;
+  }
+}
+
+/*  REDUCED MOTION  */
+@media (prefers-reduced-motion: reduce) {
+
+  .scene-hold,
+  .scene-keep-frame {
+    position: static;
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+    isolation: auto;
+  }
+
+  .scene-hold>*,
+  .scene-keep-frame>* {
+    height: auto;
+  }
+
+  .scene-runway,
+  .scene-keep-runway {
+    display: none;
+  }
+}

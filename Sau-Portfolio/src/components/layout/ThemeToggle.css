@@ -1,0 +1,71 @@
+/* Sun | Moon — small pill, matches the header's language-pill geometry */
+
+.themetoggle-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  isolation: isolate;
+}
+
+.themetoggle-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
+  border-radius: 999px;
+  background: var(--chrome);
+  transition: transform 0.42s var(--ease-out-expo), background 0.3s ease;
+  z-index: -1;
+}
+
+.themetoggle-opt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  min-height: 24px;
+  padding: 5px 8px;
+  color: var(--ink-3);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.3s ease, transform 0.3s var(--ease-out-expo);
+}
+
+.themetoggle-opt:hover {
+  color: var(--ink-2);
+  transform: translateY(-1px);
+}
+
+.themetoggle-on {
+  color: var(--chrome-fg);
+}
+
+.themetoggle-on:hover {
+  color: var(--chrome-fg);
+}
+
+.themetoggle-opt:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .themetoggle-thumb,
+  .themetoggle-opt {
+    transition: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .themetoggle-opt {
+    min-width: 26px;
+    min-height: 22px;
+    padding: 4px 6px;
+  }
+}

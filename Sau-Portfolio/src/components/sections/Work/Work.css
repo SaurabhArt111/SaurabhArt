@@ -1,0 +1,473 @@
+/*  FEATURED WORK — curved project track  */
+
+.work-work {
+  position: relative;
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 96px 0 0;
+}
+
+/* ---------- header ---------- */
+.work-header {
+  max-width: var(--max);
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 44px;
+}
+
+.work-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 22px;
+}
+
+.work-eyebrow span {
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.work-eyebrow::after {
+  content: "";
+  flex: 0 0 34px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.work-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 30px;
+  flex-wrap: wrap;
+}
+
+.work-h2 {
+  font-weight: 900;
+  font-size: clamp(34px, 4.4vw, 58px);
+  letter-spacing: -0.03em;
+  line-height: 1.02;
+}
+
+.work-serif {
+  font-family: var(--font-serif), Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+}
+
+.work-lede {
+  max-width: 360px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-2);
+}
+
+/* ---------- stage & cards ---------- */
+.work-stage {
+  flex: 1;
+  position: relative;
+  perspective: 1500px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 480px;
+}
+
+.work-track {
+  position: relative;
+  width: 100%;
+  height: 470px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+}
+
+.work-card {
+  position: absolute;
+  width: 300px;
+  will-change: transform, opacity;
+}
+
+.work-inner {
+  display: block;
+  background: var(--surface);
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  transition: translate 0.35s var(--ease-out-expo), box-shadow 0.35s ease;
+}
+
+.work-inner:hover {
+  translate: 0 -10px;
+  box-shadow: 0 60px 130px -24px rgba(0, 0, 0, 0.3), 0 10px 32px rgba(0, 0, 0, 0.12);
+}
+
+/* the cover is a real <button> now — reset its UA chrome before styling it
+   like the original decorative panel */
+.work-cover {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  height: 258px;
+  /* trimmed to make room for the contribution line */
+  background: var(--ph);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  overflow: hidden;
+  cursor: pointer;
+  transform-origin: center;
+  transition: transform 0.5s var(--ease-out-expo);
+}
+
+/* hover / focus / active-tap — the cover itself expands, on top of the
+   card's own -10px lift, so the two motions read as one confident gesture */
+.work-cover:hover,
+.work-cover:focus-visible {
+  transform: scale(1.06);
+}
+
+.work-cover:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* glass-morphism reveal, centred over the expanding cover */
+.work-cover-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  opacity: 0;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.32));
+  transition: opacity 0.4s ease;
+}
+
+.work-cover:hover .work-cover-overlay,
+.work-cover:focus-visible .work-cover-overlay {
+  opacity: 1;
+}
+
+.work-cover-overlay-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  color: #fff;
+  transform: scale(0.7);
+  transition: transform 0.4s var(--ease-out-expo);
+}
+
+.work-cover:hover .work-cover-overlay-icon,
+.work-cover:focus-visible .work-cover-overlay-icon {
+  transform: scale(1);
+}
+
+.work-cover-overlay-text {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+/* touch devices have no hover — keep the affordance visible at rest */
+@media (hover: none) {
+  .work-cover-overlay {
+    opacity: 1;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.38) 78%);
+  }
+
+  .work-cover-overlay-icon {
+    transform: scale(1);
+    width: 38px;
+    height: 38px;
+  }
+}
+
+.work-award {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 4;
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+}
+
+/* his own capture of the built site — fills the cover */
+.work-cover-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* verified brand mark centred on its brand ground */
+.work-cover-brand {
+  width: min(66%, 200px);
+  height: auto;
+  object-fit: contain;
+}
+
+/* typographic cover for projects with no supplied asset yet */
+.work-cover-mark {
+  font-weight: 900;
+  font-size: clamp(44px, 4.2vw, 60px);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+/* verified brand destination — sibling of the card link (never nested) */
+.work-site-chip {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--chip-glass);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.3s ease, transform 0.35s var(--ease-out-expo),
+    background 0.25s ease, color 0.25s ease;
+}
+
+.work-card:hover .work-site-chip,
+.work-site-chip:focus-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.work-site-chip:hover {
+  background: var(--chrome);
+  color: var(--chrome-fg);
+}
+
+/* touch devices have no hover — the chip is simply always present */
+@media (hover: none) {
+  .work-site-chip {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.work-meta {
+  padding: 18px 20px 20px;
+}
+
+.work-meta h3 {
+  font-size: 16.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  color: var(--ink);
+}
+
+/* the card's one-line "what I did" — clamped so FR length can't break the arc */
+.work-contribution {
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.work-tags {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+  margin-top: 7px;
+}
+
+.work-meta-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.work-year {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.work-open {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  opacity: 0;
+  transform: translateX(-6px);
+  transition: opacity 0.3s ease, transform 0.35s var(--ease-out-expo);
+}
+
+.work-open svg {
+  color: var(--accent);
+}
+
+.work-inner:hover .work-open,
+.work-open:focus-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ---------- foot: counter · dots · hint ---------- */
+.work-foot {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 24px;
+  max-width: var(--max);
+  width: 100%;
+  margin: 0 auto;
+  padding: 18px 44px 26px;
+}
+
+.work-count {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  justify-self: start;
+}
+
+.work-dots {
+  display: flex;
+  gap: 8px;
+  justify-self: center;
+}
+
+.work-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line);
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+.work-dot-on {
+  background: var(--accent);
+  transform: scale(1.25);
+}
+
+.work-hint {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--ink-3);
+  justify-self: end;
+}
+
+@media (max-width: 1100px), (prefers-reduced-motion: reduce) {
+  .work-work {
+    min-height: 0;
+    padding: 80px 0 0;
+  }
+
+  .work-header {
+    padding: 0 24px;
+  }
+
+  .work-stage {
+    perspective: none;
+    min-height: 0;
+    display: block;
+    margin-top: 40px;
+  }
+
+  .work-track {
+    position: static;
+    height: auto;
+    display: flex;
+    justify-content: flex-start;
+    gap: 18px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding: 6px 24px 26px;
+    scrollbar-width: none;
+  }
+
+  .work-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  .work-card {
+    position: static;
+    flex: 0 0 82vw;
+    max-width: 320px;
+    scroll-snap-align: center;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+
+  .work-cover {
+    height: 240px;
+  }
+
+  .work-cover:hover,
+  .work-cover:focus-visible {
+    transform: none;
+  }
+
+  .work-foot {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 6px 24px 30px;
+  }
+
+  .work-count,
+  .work-hint,
+  .work-dots {
+    display: none;
+  }
+}
