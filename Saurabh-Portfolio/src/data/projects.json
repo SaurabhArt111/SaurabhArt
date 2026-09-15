@@ -127,7 +127,7 @@
     "tags": ["Operations", "JERN"],
     "contribution": "A lightweight full-stack architecture for mini software, rapid prototypes and focused utilities.",
     "coverLabel": "JERN STACK",
-    "accent": "#ff6a4d",
+    "accent": "#acacac",
     "preview": "landing",
     "site": { "url": "https://jern-psi.vercel.app", "label": "Live" },
     "repo": "https://github.com/SaurabhArt111/jern-stack.git"

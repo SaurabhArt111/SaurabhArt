@@ -175,11 +175,9 @@
 
 .conn-signoff {
   position: relative;
-  margin: clamp(64px, 9vw, 120px) auto 0;
+  margin: clamp(64px, 4vw, 100px) auto 0;
   max-width: var(--max);
   padding: 0 clamp(16px, 4vw, 44px);
-  /* the particles are faint by design; the band is tall enough that the
-     sentence has room to scatter without clipping */
   height: clamp(150px, 20vw, 230px);
 }
 

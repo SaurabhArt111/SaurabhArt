@@ -128,6 +128,8 @@ export default function Connect() {
         <ParticleMorph
           morph="text"
           hoverEffect="scatter"
+          autoCycle
+          cycleDelay={5000}
           count={1300}
           label="Artist, designer, developer"
         />

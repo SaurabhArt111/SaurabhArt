@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { FiMenu, FiX } from "react-icons/fi";
+import { FiMaximize2, FiMenu, FiMinimize2, FiX } from "react-icons/fi";
 import { gsap, ScrollTrigger } from "../../lib/gsap";
 import heroProgress from "../../lib/heroProgress";
 import ThemeToggle from "./ThemeToggle";
@@ -16,6 +16,14 @@ const styles = {
   "on": "nav-on",
   "roll": "nav-roll",
   "right": "nav-right",
+  "fullscreen": "nav-fullscreen",
+  "prompt": "fullscreen-prompt",
+  "promptOpen": "fullscreen-prompt-open",
+  "promptCopy": "fullscreen-prompt-copy",
+  "promptKicker": "fullscreen-prompt-kicker",
+  "promptActions": "fullscreen-prompt-actions",
+  "promptPrimary": "fullscreen-prompt-primary",
+  "promptDismiss": "fullscreen-prompt-dismiss",
   "burger": "nav-burger",
   "burgerOpen": "nav-burger-open",
   "sheet": "nav-sheet",
@@ -40,6 +48,8 @@ export default function Nav() {
   const ref = useRef(null);
   const { t } = useLang();
   const [active, setActive] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
   /* the header stays hidden through the opening character-sequence cover and
      only reveals once you're more than halfway through it — driven directly
      by the same scroll-progress value the character canvas itself uses
@@ -50,6 +60,70 @@ export default function Nav() {
      at phone widths, so below 900px navigation lives behind a menu button
      rather than being hidden entirely (which is what it was doing) */
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      /* Fullscreen can be rejected by the browser or embedding context. */
+    }
+  };
+
+  useEffect(() => {
+    const syncFullscreen = () => {
+      const active = Boolean(document.fullscreenElement);
+      setIsFullscreen(active);
+      if (active) setPromptOpen(false);
+    };
+    const onKey = (e) => {
+      const target = e.target;
+      const isTyping =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target.isContentEditable;
+
+      if (!isTyping && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        toggleFullscreen();
+      }
+    };
+
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    window.addEventListener("keydown", onKey);
+    syncFullscreen();
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreen);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (
+      !document.documentElement.requestFullscreen ||
+      document.fullscreenElement ||
+      sessionStorage.getItem("fullscreen-prompt-dismissed")
+    ) {
+      return undefined;
+    }
+
+    const id = window.setTimeout(() => setPromptOpen(true), 900);
+    return () => window.clearTimeout(id);
+  }, []);
+
+  const dismissPrompt = () => {
+    sessionStorage.setItem("fullscreen-prompt-dismissed", "true");
+    setPromptOpen(false);
+  };
+
+  const acceptPrompt = () => {
+    setPromptOpen(false);
+    toggleFullscreen();
+  };
 
   /* close on Escape, and lock the page behind the open drawer */
   useEffect(() => {
@@ -138,11 +212,12 @@ export default function Nav() {
   }, []);
 
   return (
-    <header
-      className={`${styles.wrap} ${visible ? styles.wrapVisible : ""}`}
-      ref={ref}
-    >
-      <div className={styles.cap}>
+    <>
+      <header
+        className={`${styles.wrap} ${visible ? styles.wrapVisible : ""}`}
+        ref={ref}
+      >
+        <div className={styles.cap}>
         <a href="#home" className={styles.logo} aria-label={t("nav.home")}>
           SAURABH<i>.</i>
         </a>
@@ -170,6 +245,15 @@ export default function Nav() {
           <ThemeToggle />
           <button
             type="button"
+            className={styles.fullscreen}
+            onClick={toggleFullscreen}
+            aria-label={isFullscreen ? t("nav.exitFullscreen") : t("nav.fullscreen")}
+            title={isFullscreen ? t("nav.exitFullscreen") : t("nav.fullscreen")}
+          >
+            {isFullscreen ? <FiMinimize2 size={16} /> : <FiMaximize2 size={16} />}
+          </button>
+          <button
+            type="button"
             className={`${styles.burger} ${menuOpen ? styles.burgerOpen : ""}`}
             aria-label={menuOpen ? t("nav.close") : t("nav.menu")}
             aria-expanded={menuOpen}
@@ -179,35 +263,62 @@ export default function Nav() {
             {menuOpen ? <FiX size={18} /> : <FiMenu size={18} />}
           </button>
         </div>
-      </div>
+        </div>
 
       {/* ---------- mobile drawer ---------- */}
-      <div
-        className={`${styles.sheet} ${menuOpen ? styles.sheetOpen : ""}`}
-        id="mobile-nav"
-        hidden={!menuOpen}
-      >
-        <nav aria-label="Primary mobile">
-          {LINKS.map((l) => (
-            <a
-              key={l.key}
-              href={l.href}
-              className={l.watch === active ? styles.sheetOn : ""}
-              aria-current={l.watch === active ? "page" : undefined}
-              onClick={() => setMenuOpen(false)}
+        <div
+          className={`${styles.sheet} ${menuOpen ? styles.sheetOpen : ""}`}
+          id="mobile-nav"
+          hidden={!menuOpen}
+        >
+          <nav aria-label="Primary mobile">
+            {LINKS.map((l) => (
+              <a
+                key={l.key}
+                href={l.href}
+                className={l.watch === active ? styles.sheetOn : ""}
+                aria-current={l.watch === active ? "page" : undefined}
+                onClick={() => setMenuOpen(false)}
+              >
+                {t(l.key)}
+              </a>
+            ))}
+            <button
+              type="button"
+              className={styles.fullscreen}
+              onClick={() => {
+                setMenuOpen(false);
+                toggleFullscreen();
+              }}
             >
-              {t(l.key)}
-            </a>
-          ))}
-        </nav>
-      </div>
-      <button
-        type="button"
-        className={`${styles.scrim} ${menuOpen ? styles.scrimOn : ""}`}
-        aria-label={t("nav.close")}
-        tabIndex={menuOpen ? 0 : -1}
-        onClick={() => setMenuOpen(false)}
-      />
-    </header>
+              {isFullscreen ? <FiMinimize2 size={16} /> : <FiMaximize2 size={16} />}
+              {isFullscreen ? t("nav.exitFullscreen") : t("nav.fullscreen")}
+            </button>
+          </nav>
+        </div>
+        <button
+          type="button"
+          className={`${styles.scrim} ${menuOpen ? styles.scrimOn : ""}`}
+          aria-label={t("nav.close")}
+          tabIndex={menuOpen ? 0 : -1}
+          onClick={() => setMenuOpen(false)}
+        />
+      </header>
+
+      <aside className={`${styles.prompt} ${promptOpen ? styles.promptOpen : ""}`}>
+        <div className={styles.promptCopy}>
+          <span className={styles.promptKicker}>VIEW MODE</span>
+          <strong>{t("nav.fullscreenPrompt")}</strong>
+        </div>
+        <div className={styles.promptActions}>
+          <button type="button" className={styles.promptPrimary} onClick={acceptPrompt}>
+            <FiMaximize2 size={14} /> {t("nav.fullscreen")}
+          </button>
+          <button type="button" className={styles.promptDismiss} onClick={dismissPrompt}>
+            {t("nav.noThanks")}
+          </button>
+        </div>
+      </aside>
+    </>
   );
 }

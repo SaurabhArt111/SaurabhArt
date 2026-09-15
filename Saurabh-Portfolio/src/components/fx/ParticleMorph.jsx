@@ -41,6 +41,9 @@ import "./ParticleMorph.css";
  *   progressRef   { current: 0..1 } — required for "scrub"
  *   hoverEffect   "scatter" | "gather" | "none"
  *   count         particle budget override
+ *   autoCycle     wait until visible, then alternate text and flow states
+ *   cycleDelay    delay in milliseconds before autoCycle starts
+ *   cycleDuration time in milliseconds between autoCycle state changes
  */
 
 const BASE_SPEED = 0.0075; // radians per 60fps frame
@@ -52,6 +55,9 @@ export default function ParticleMorph({
   progressRef = null,
   hoverEffect = "scatter",
   count,
+  autoCycle = false,
+  cycleDelay = 5000,
+  cycleDuration = 7000,
   className = "",
   label,
 }) {
@@ -77,6 +83,7 @@ export default function ParticleMorph({
 
     const pointer = { x: -9999, y: -9999, active: false };
     const state = { morph: morph === "text" ? 1 : 0, hover: 0, swing: 0 };
+    const cycle = { target: 1, started: false, timeout: 0, interval: 0 };
 
     const build = () => {
       const fit = fitCanvas(canvas, 1.75);
@@ -142,6 +149,31 @@ export default function ParticleMorph({
 
     build();
 
+    let stopCycleObservation = () => {};
+    if (autoCycle) {
+      const startCycle = () => {
+        if (cycle.started) return;
+        cycle.started = true;
+        cycle.timeout = window.setTimeout(() => {
+          cycle.target = 0;
+          cycle.interval = window.setInterval(() => {
+            cycle.target = cycle.target === 1 ? 0 : 1;
+          }, cycleDuration);
+        }, cycleDelay);
+      };
+
+      if (typeof IntersectionObserver === "undefined") {
+        startCycle();
+      } else {
+        const observer = new IntersectionObserver(
+          ([entry]) => entry.isIntersecting && startCycle(),
+          { threshold: 0.35 }
+        );
+        observer.observe(canvas);
+        stopCycleObservation = () => observer.disconnect();
+      }
+    }
+
     /* re-sample once the webfont is ready — see the note in ParticleTitle */
     let alive = true;
     document.fonts?.ready
@@ -152,14 +184,16 @@ export default function ParticleMorph({
 
     const step = (dt, elapsed) => {
       /* ---- resolve the morph target ---- */
-      let target = morph === "text" ? 1 : 0;
+      let target = autoCycle ? cycle.target : morph === "text" ? 1 : 0;
       if (morph === "scrub") {
         /* a bell: flows in, gathers into the sentence across the middle of
            the band's travel, then lets go again on the way out */
         const p = clamp(progressRef?.current ?? 0, 0, 1);
         target = smoothstep(0.16, 0.46, p) - smoothstep(0.72, 0.98, p);
       }
-      if (hoverEffect === "scatter") target -= state.hover * target;
+      if (hoverEffect === "scatter") {
+        target = autoCycle ? target + state.hover * (1 - target * 2) : target - state.hover * target;
+      }
       else if (hoverEffect === "gather") target += state.hover * (1 - target);
 
       state.morph = approach(state.morph, clamp(target, 0, 1), 0.045, dt);
@@ -320,12 +354,15 @@ export default function ParticleMorph({
     return () => {
       alive = false;
       loop.stop();
+      window.clearTimeout(cycle.timeout);
+      window.clearInterval(cycle.interval);
+      stopCycleObservation();
       stopTheme();
       window.removeEventListener("resize", onResize);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerleave", onOut);
     };
-  }, [reduced, morph, progressRef, text, hoverEffect, count]);
+  }, [reduced, morph, progressRef, text, hoverEffect, count, autoCycle, cycleDelay, cycleDuration]);
 
   if (reduced) {
     return (

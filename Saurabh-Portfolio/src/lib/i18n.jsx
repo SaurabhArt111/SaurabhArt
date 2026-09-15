@@ -16,6 +16,10 @@ export const DICT = {
   "nav.contact": "Contact",
   "nav.menu": "Open menu",
   "nav.close": "Close menu",
+  "nav.fullscreen": "Go fullscreen",
+  "nav.exitFullscreen": "Exit fullscreen",
+  "nav.fullscreenPrompt": "Make the portfolio feel more immersive?",
+  "nav.noThanks": "No thanks",
 
   /* ---------------- hero ---------------- */
   "hero.kicker": "Artist, Designer & Developer",

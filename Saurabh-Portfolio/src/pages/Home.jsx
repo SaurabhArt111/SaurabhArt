@@ -47,7 +47,7 @@ export default function Home() {
 
         {/* the ∞ band — a held breath between the work and the offer. Its
             runway is what the particle morph scrubs against. */}
-        <Scene order={5} runway={2} id="loop">
+        <Scene order={5} runway={.5} id="loop">
           <Interlude />
         </Scene>
 
