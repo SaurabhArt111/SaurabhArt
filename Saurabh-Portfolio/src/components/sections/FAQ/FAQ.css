@@ -1,0 +1,141 @@
+.faq-faq {
+  position: relative;
+  background: var(--bg);
+  padding: 120px 24px 130px;
+  border-top: 1px solid var(--line);
+}
+
+.faq-header {
+  max-width: 720px;
+  margin: 0 auto 48px;
+}
+
+.faq-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 18px;
+}
+
+.faq-eyebrow span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 10px;
+}
+
+.faq-h2 {
+  font-size: clamp(32px, 4.4vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.faq-serif {
+  font-family: var(--font-script, cursive);
+  font-weight: 500;
+  color: var(--accent);
+  font-style: italic;
+}
+
+.faq-lede {
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.faq-list {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.faq-item {
+  border-bottom: 1px solid var(--line);
+}
+
+.faq-q {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 22px 4px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.faq-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  transition: transform 0.35s var(--ease-out-expo), background 0.3s ease, color 0.3s ease;
+}
+
+.faq-q-open .faq-plus {
+  transform: rotate(135deg);
+  background: var(--chrome);
+  color: var(--chrome-fg);
+}
+
+.faq-a-wrap {
+  display: grid;
+  grid-template-rows: minmax(0, 0fr);
+  overflow: hidden;
+  transition: grid-template-rows 0.4s var(--ease-out-expo);
+}
+
+.faq-a-wrap > .faq-a {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.faq-a {
+  margin: 0;
+  padding: 0;
+  font-size: 14.5px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.faq-a-open {
+  padding: 0 30px 20px 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .faq-a-wrap {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .faq-faq {
+    padding: 96px 20px 100px;
+  }
+
+  .faq-q {
+    font-size: 14.5px;
+  }
+}

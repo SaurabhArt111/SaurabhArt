@@ -1,0 +1,151 @@
+.proc-process {
+  position: relative;
+  background: var(--bg);
+  padding: 120px 24px 130px;
+  border-top: 1px solid var(--line);
+}
+
+.proc-header {
+  max-width: var(--max);
+  margin: 0 auto 64px;
+}
+
+.proc-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 18px;
+}
+
+.proc-eyebrow span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 10px;
+}
+
+.proc-h2 {
+  font-size: clamp(32px, 4.4vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.proc-serif {
+  font-family: var(--font-script, cursive);
+  font-weight: 500;
+  color: var(--accent);
+  font-style: italic;
+}
+
+.proc-lede {
+  max-width: 560px;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.proc-rail {
+  position: relative;
+  max-width: var(--max);
+  margin: 0 auto;
+}
+
+.proc-line {
+  display: none;
+}
+
+.proc-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+  position: relative;
+}
+
+.proc-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 24px 24px;
+}
+
+.proc-num {
+  font: 12px "DM Mono", monospace;
+  font-weight: 700;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+
+.proc-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  color: var(--accent);
+}
+
+.proc-title {
+  font-size: 16.5px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.proc-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  max-width: 240px;
+}
+
+/* the connecting line only makes sense on wide, single-row layouts */
+@media (min-width: 900px) {
+  .proc-line {
+    display: block;
+    position: absolute;
+    top: 26px;
+    left: 26px;
+    right: 26px;
+    height: 2px;
+    width: calc(100% - 52px);
+    overflow: visible;
+  }
+
+  .proc-line path {
+    fill: none;
+  }
+}
+
+@media (max-width: 899px) {
+  .proc-steps {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding-left: 26px;
+    border-left: 2px solid var(--line);
+  }
+
+  .proc-step {
+    padding-left: 20px;
+    margin-left: -28px;
+  }
+}
+
+@media (max-width: 640px) {
+  .proc-process {
+    padding: 96px 20px 100px;
+  }
+}

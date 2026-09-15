@@ -1,0 +1,74 @@
+/*  VelocityMarquee — editorial skill bands  */
+
+.vmq-marquee {
+  position: relative;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  /* this band can end up as the very first thing in a pinned section
+     (About stacks it right at the top), so it needs to clear the fixed
+     nav itself rather than relying on whatever follows it for spacing */
+  padding: calc(var(--nav-offset, 104px) + 22px) 0 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.vmq-row {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.vmq-track {
+  display: inline-flex;
+  will-change: transform;
+}
+
+.vmq-copy {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.vmq-item {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.vmq-solid-text,
+.vmq-outline-text {
+  font-weight: 900;
+  font-size: clamp(26px, 3.4vw, 46px);
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  text-transform: none;
+}
+.vmq-solid-text {
+  color: var(--ink);
+}
+.vmq-outline-text {
+  color: transparent;
+  -webkit-text-stroke: 1.4px var(--ink);
+}
+
+.vmq-sep {
+  color: var(--accent);
+  font-size: 0.5em;
+  margin: 0 26px;
+  align-self: center;
+}
+
+.vmq-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vmq-track {
+    transform: none !important;
+  }
+}

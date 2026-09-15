@@ -1,0 +1,145 @@
+[
+  {
+    "slug": "code-forge",
+    "title": "Code Forge",
+    "tags": ["React", "Node.js", "MongoDB"],
+    "contribution": "A browser-based development workspace and VS Code-inspired web application.",
+    "coverLabel": "CODE FORGE",
+    "accent": "#7c9cff",
+    "preview": "editor",
+    "site": { "url": "https://code-forge-gamma.vercel.app", "label": "Live" },
+    "repo": "https://github.com/SaurabhArt111/CodeForge"
+  },
+  {
+    "slug": "drift-x-commune",
+    "title": "Drift X Commune",
+    "tags": ["React", "Booking", "Admin"],
+    "contribution": "A premium motorsports and gaming booking experience with management tools.",
+    "coverLabel": "DRIFT X COMMUNE",
+    "accent": "#ff6a4d",
+    "preview": "landing",
+    "site": { "url": "https://driftxcommune.com", "label": "Live" }
+  },
+  {
+    "slug": "game-center-management",
+    "title": "Game Center Management",
+    "tags": ["Dashboard", "Operations", "MERN"],
+    "contribution": "A game-center management and control system for operational workflows. Still working on it, will be live soon.",
+    "coverLabel": "GAME CENTER MANAGEMENT",
+    "accent": "#39d98a",
+    "preview": "dashboard",
+    "site": { "url": "https://driftxcommune.com", "label": "Live" },
+    "repo": "https://github.com/SaurabhArt111/Game-Center"
+  },
+  {
+    "slug": "dynamic-qr",
+    "title": "Dynamic QR",
+    "tags": ["React", "QR", "Utility"],
+    "contribution": "A dynamic QR management application built for practical everyday use.",
+    "coverLabel": "DYNAMIC QR",
+    "accent": "#141414",
+    "preview": "qr",
+    "site": { "url": "https://dynamicqr-iota.vercel.app", "label": "Live" }
+  },
+  {
+    "slug": "compressor",
+    "title": "Compressor",
+    "tags": ["Media", "Web App", "UX"],
+    "contribution": "A web application for compressing and handling digital media.",
+    "coverLabel": "COMPRESSOR",
+    "accent": "#a78bfa",
+    "preview": "uploader"
+  },
+  {
+    "slug": "overlaylounge",
+    "title": "Overlay Lounge",
+    "tags": ["React", "Booking", "Admin"],
+    "contribution": "Overlay Lounge is where architects, designers and homeowners come to touch, compare and choose the finishes that tell the story of a space.",
+    "coverLabel": "OVERLAY LOUNGE",
+    "accent": "#800020",
+    "preview": "landing",
+    "site": { "url": "https://theoverlaylounge.io", "label": "SOON" }
+  },
+  {
+    "slug": "hello-chat",
+    "title": "Hello Chat",
+    "tags": ["Realtime", "Chat", "MERN"],
+    "contribution": "A realtime chat application built on the MERN stack.",
+    "coverLabel": "HELLO CHAT",
+    "accent": "#ff6a4d",
+    "preview": "chat",
+    "site": { "url": "https://hello-chat-ebon.vercel.app", "label": "Live" },
+    "repo": "https://github.com/SaurabhArt111/Hello-Chat.git"
+  },
+  {
+    "slug": "lan-chat",
+    "title": "LAN-CHAT",
+    "tags": ["Realtime", "Chat", "MERN"],
+    "contribution": "A local network communication application with a modern chat interface.",
+    "coverLabel": "LAN-CHAT",
+    "accent": "#2dd4bf",
+    "preview": "chat",
+    "repo": "https://github.com/SaurabhArt111/LAN-CHAT"
+  },
+  {
+    "slug": "attendance-hub",
+    "title": "Attendance Hub",
+    "tags": ["SaaS", "HR", "Dashboard"],
+    "contribution": "An employee attendance and management web application.",
+    "coverLabel": "ATTENDANCE HUB",
+    "accent": "#ffb020",
+    "preview": "dashboard",
+    "site": { "url": "https://attendancehub-saas.vercel.app", "label": "Live" }
+  },
+  {
+    "slug": "movie-booking",
+    "title": "Movie Booking",
+    "tags": ["PHP", "MySQL", "Booking"],
+    "contribution": "A PHP-based movie booking application with database-backed workflows.",
+    "coverLabel": "MOVIE BOOKING",
+    "accent": "#ff2e6e",
+    "preview": "grid",
+    "repo": "https://github.com/SaurabhArt111/Movie_booking_php"
+  },
+  {
+    "slug": "event-planner",
+    "title": "Event Planner",
+    "tags": ["MERN", "Events", "Planning"],
+    "contribution": "A web application for planning and managing events.",
+    "coverLabel": "EVENT PLANNER",
+    "accent": "#5b8def",
+    "preview": "calendar",
+    "repo": "https://github.com/SaurabhArt111/Event-Planner"
+  },
+  {
+    "slug": "quiz-show",
+    "title": "Quiz Show",
+    "tags": ["Games", "MERN", "Admin"],
+    "contribution": "A web application for hosting and managing quiz competitions.",
+    "coverLabel": "QUIZ SHOW",
+    "accent": "#ff2e0f",
+    "preview": "quiz",
+    "repo": "https://github.com/SaurabhArt111/Quiz_Show"
+  },
+  {
+    "slug": "jern-stack",
+    "title": "JERN Stack",
+    "tags": ["Operations", "JERN"],
+    "contribution": "A lightweight full-stack architecture for mini software, rapid prototypes and focused utilities.",
+    "coverLabel": "JERN STACK",
+    "accent": "#ff6a4d",
+    "preview": "landing",
+    "site": { "url": "https://jern-psi.vercel.app", "label": "Live" },
+    "repo": "https://github.com/SaurabhArt111/jern-stack.git"
+  },
+  {
+    "slug": "yarn-inventory",
+    "title": "Yarn Inventory",
+    "tags": ["Inventory", "Management"],
+    "contribution": "A web application for managing yarn inventory and tracking stock levels.",
+    "coverLabel": "YARN INVENTORY",
+    "accent": "#ff6a4d",
+    "preview": "login",
+    "repo": "https://github.com/SaurabhArt111/Yarn-Inventory.git"
+  }
+]

@@ -1,0 +1,123 @@
+.svc-services {
+  position: relative;
+  background: var(--bg);
+  padding: 120px 24px 100px;
+  border-top: 1px solid var(--line);
+}
+
+.svc-header {
+  max-width: var(--max);
+  margin: 0 auto 48px;
+}
+
+.svc-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 18px;
+}
+
+.svc-eyebrow span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 10px;
+}
+
+.svc-h2 {
+  font-size: clamp(32px, 4.4vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.svc-serif {
+  font-family: var(--font-script, cursive);
+  font-weight: 500;
+  color: var(--accent);
+  font-style: italic;
+}
+
+.svc-lede {
+  max-width: 560px;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-2);
+}
+
+.svc-grid {
+  max-width: var(--max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+}
+
+.svc-card {
+  padding: 28px 24px;
+  border-radius: 20px;
+  transition: transform 0.4s var(--ease-out-expo);
+}
+
+.svc-card:hover {
+  transform: translateY(-6px) scale(1.02);
+}
+
+.svc-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: var(--chrome);
+  color: var(--chrome-fg);
+  margin-bottom: 20px;
+}
+
+.svc-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.svc-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin-bottom: 18px;
+}
+
+.svc-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.svc-tags span {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  color: var(--ink-3);
+}
+
+@media (max-width: 640px) {
+  .svc-services {
+    padding: 96px 20px 80px;
+  }
+}

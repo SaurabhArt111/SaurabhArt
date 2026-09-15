@@ -1,0 +1,74 @@
+[
+  {
+    "id": "piece-01",
+    "title": "Untitled Study 01",
+    "category": "Illustration",
+    "medium": "Digital painting",
+    "accent": "#ff6a4d",
+    "span": "tall"
+  },
+  {
+    "id": "piece-02",
+    "title": "Mark & Wordmark",
+    "category": "Branding",
+    "medium": "Logo system",
+    "accent": "#7c9cff",
+    "span": "square"
+  },
+  {
+    "id": "piece-03",
+    "title": "Dashboard Concept",
+    "category": "UI Concepts",
+    "medium": "Product UI",
+    "accent": "#39d98a",
+    "span": "wide"
+  },
+  {
+    "id": "piece-04",
+    "title": "Event Poster 01",
+    "category": "Posters",
+    "medium": "Print design",
+    "accent": "#ffb020",
+    "span": "square"
+  },
+  {
+    "id": "piece-05",
+    "title": "Character Study",
+    "category": "Illustration",
+    "medium": "Procreate",
+    "accent": "#a78bfa",
+    "span": "square"
+  },
+  {
+    "id": "piece-06",
+    "title": "Identity Explorations",
+    "category": "Branding",
+    "medium": "Brand identity",
+    "accent": "#2dd4bf",
+    "span": "tall"
+  },
+  {
+    "id": "piece-07",
+    "title": "Mobile App Concept",
+    "category": "UI Concepts",
+    "medium": "App UI",
+    "accent": "#ff2e6e",
+    "span": "square"
+  },
+  {
+    "id": "piece-08",
+    "title": "Gig Poster 01",
+    "category": "Posters",
+    "medium": "Print design",
+    "accent": "#5b8def",
+    "span": "wide"
+  },
+  {
+    "id": "piece-09",
+    "title": "Texture & Form",
+    "category": "Illustration",
+    "medium": "Mixed media",
+    "accent": "#ff2e0f",
+    "span": "square"
+  }
+]

@@ -1,0 +1,342 @@
+/*  GALLERY — art & design work. A flowing section (like Connect), not a
+    pinned Scene, so the grid can grow to whatever height its content needs. */
+
+.gal-gallery {
+  position: relative;
+  background: var(--bg);
+  padding: 120px 24px 140px;
+}
+
+.gal-header {
+  max-width: var(--max);
+  margin: 0 auto 48px;
+}
+
+.gal-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 18px;
+}
+
+.gal-eyebrow span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 10px;
+}
+
+.gal-h2 {
+  font-size: clamp(32px, 4.4vw, 56px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.05;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.gal-serif {
+  font-family: var(--font-script, cursive);
+  font-weight: 500;
+  color: var(--accent);
+  font-style: italic;
+}
+
+.gal-lede {
+  max-width: 560px;
+  font-size: 17px;
+  line-height: 1.65;
+  color: var(--ink-2);
+  margin-bottom: 28px;
+}
+
+.gal-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gal-tab {
+  all: unset;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
+}
+
+.gal-tab:hover {
+  border-color: var(--chrome);
+}
+
+.gal-tab-on {
+  background: var(--chrome);
+  color: var(--chrome-fg);
+  border-color: var(--chrome);
+}
+
+/* ---------- grid ---------- */
+.gal-grid {
+  max-width: var(--max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-auto-rows: 200px;
+  gap: 16px;
+}
+
+.gal-tile-wide {
+  grid-column: span 2;
+}
+
+.gal-tile-tall {
+  grid-row: span 2;
+}
+
+.gal-tile {
+  all: unset;
+  box-sizing: border-box;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  transition: transform 0.4s var(--ease-out-expo), box-shadow 0.4s ease;
+}
+
+.gal-tile:hover,
+.gal-tile:focus-visible {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow-lg);
+}
+
+.gal-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.gal-art {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gal-art-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gal-doodle {
+  width: 42%;
+  max-width: 90px;
+  opacity: 0.85;
+  stroke-dasharray: 140;
+  stroke-dashoffset: 140;
+  animation: gal-draw 2.6s ease-in-out infinite alternate;
+  transition: transform 0.5s var(--ease-out-expo);
+}
+
+.gal-tile:hover .gal-doodle {
+  transform: scale(1.08) rotate(-3deg);
+}
+
+@keyframes gal-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.gal-meta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.55));
+  transform: translateY(100%);
+  transition: transform 0.35s var(--ease-out-expo);
+}
+
+.gal-tile:hover .gal-meta,
+.gal-tile:focus-visible .gal-meta {
+  transform: translateY(0);
+}
+
+.gal-meta-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.gal-meta-sub {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+/* touch devices — no hover, keep the caption legible at rest */
+@media (hover: none) {
+  .gal-meta {
+    transform: translateY(0);
+    background: linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.6));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gal-doodle {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .gal-gallery {
+    padding: 96px 20px 110px;
+  }
+
+  .gal-grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 150px;
+  }
+
+  .gal-tile-wide {
+    grid-column: span 2;
+  }
+}
+
+/* ---------- lightbox ---------- */
+.gal-lb-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 5vw, 56px);
+  background: rgba(8, 9, 11, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.gal-lb-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.gal-lb-art {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: min(56vh, 460px);
+}
+
+.gal-lb-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gal-lb-art .gal-doodle {
+  width: 30%;
+  max-width: 140px;
+}
+
+.gal-lb-caption {
+  padding: 20px 24px 24px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.gal-lb-caption h3 {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.gal-lb-caption p {
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink-3);
+}
+
+.gal-lb-close,
+.gal-lb-nav {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--chrome);
+  color: var(--chrome-fg);
+  z-index: 2;
+  transition: transform 0.25s var(--ease-out-expo), background 0.25s ease;
+}
+
+.gal-lb-close {
+  top: 14px;
+  right: 14px;
+  width: 34px;
+  height: 34px;
+}
+
+.gal-lb-close:hover {
+  background: var(--accent);
+  transform: rotate(90deg);
+}
+
+.gal-lb-nav {
+  top: 50%;
+  width: 38px;
+  height: 38px;
+  transform: translateY(-50%);
+}
+
+.gal-lb-prev {
+  left: 14px;
+}
+
+.gal-lb-next {
+  right: 14px;
+}
+
+.gal-lb-nav:hover {
+  background: var(--accent);
+  transform: translateY(-50%) scale(1.08);
+}
+
+@media (max-width: 560px) {
+  .gal-lb-nav {
+    width: 32px;
+    height: 32px;
+  }
+}
