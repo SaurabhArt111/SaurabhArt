@@ -148,6 +148,17 @@ export const DICT = {
   "connect.credit": "Designed & Developed by",
   "connect.top": "Back to top",
 
+  /* ---------------- interlude (the ∞ band) ---------------- */
+  "interlude.kicker": "Between the work and the offer",
+  "interlude.h2a": "Three disciplines that keep handing work to",
+  "interlude.h2Em": "each other.",
+  "interlude.lede":
+    "Drawing teaches me what a layout is trying to be. The layout runs into what the browser will actually do. Writing the code sends me back to the sketchbook with better questions. There's no start of that loop, so I stopped looking for one.",
+  "interlude.legend": "Scroll to gather the words — move your cursor through them to let go.",
+
+  /* ---------------- closing band ---------------- */
+  "connect.signoff": "Artist, designer and developer — the same three, still looping.",
+
   /* ---------------- case study (/work/[slug]) ---------------- */
   "case.back": "← Back to work",
   "case.kicker": "Case Study",

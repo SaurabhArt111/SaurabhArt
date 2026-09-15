@@ -1,0 +1,147 @@
+/*  SVG FLOURISH — orbit dial + drawn thread  */
+
+.fx-flourish {
+  pointer-events: none;
+}
+
+.fx-flourish svg {
+  display: block;
+  overflow: visible;
+}
+
+/* ---------------- ORBIT ---------------- */
+
+.fx-flourish-orbit {
+  width: clamp(120px, 15vw, 210px);
+  aspect-ratio: 1;
+  opacity: 0.85;
+}
+
+/* every spinning group turns about the middle of the viewBox — using
+   transform-box keeps that correct regardless of how the svg is scaled */
+.fx-orbit-ticks,
+.fx-orbit-ring,
+.fx-orbit-arm {
+  transform-box: view-box;
+  transform-origin: center;
+}
+
+.fx-orbit-ticks {
+  stroke: var(--ink);
+  opacity: 0.16;
+  animation: fx-spin 90s linear infinite;
+}
+
+.fx-orbit-ring {
+  stroke: var(--ink);
+  stroke-width: 1;
+  opacity: 0.22;
+}
+
+.fx-orbit-r1 {
+  stroke-dasharray: 44 14;
+  animation: fx-spin 26s linear infinite;
+}
+
+.fx-orbit-r2 {
+  stroke-dasharray: 3 9;
+  opacity: 0.3;
+  animation: fx-spin-rev 18s linear infinite;
+}
+
+.fx-orbit-r3 {
+  stroke-dasharray: 18 8;
+  animation: fx-spin 11s linear infinite;
+}
+
+.fx-orbit-arm-1 {
+  animation: fx-spin 14s linear infinite;
+}
+
+.fx-orbit-arm-2 {
+  animation: fx-spin-rev 9s linear infinite;
+}
+
+.fx-orbit-arm-3 {
+  animation: fx-spin 6s linear infinite;
+}
+
+.fx-orbit-dot {
+  fill: var(--ink);
+  opacity: 0.75;
+}
+
+.fx-orbit-dot-accent {
+  fill: var(--accent);
+  opacity: 1;
+}
+
+.fx-orbit-core {
+  fill: var(--accent);
+}
+
+@keyframes fx-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fx-spin-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* ---------------- THREAD ---------------- */
+
+.fx-flourish-thread {
+  width: 100%;
+  height: clamp(44px, 6vw, 68px);
+}
+
+.fx-flourish-thread svg {
+  width: 100%;
+  height: 100%;
+}
+
+.fx-thread-base {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.fx-thread-draw {
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.fx-thread-dot {
+  fill: var(--accent);
+  opacity: 0.9;
+}
+
+/* if animateMotion is unavailable the rider parks at the svg origin, so it
+   is kept faint enough to pass for a hairline tick rather than a stray dot */
+.fx-thread-rider {
+  opacity: 0.9;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .fx-orbit-ticks,
+  .fx-orbit-r1,
+  .fx-orbit-r2,
+  .fx-orbit-r3,
+  .fx-orbit-arm {
+    animation: none;
+  }
+
+  .fx-orbit-dot,
+  .fx-thread-dot {
+    display: none;
+  }
+
+  .fx-thread-draw {
+    stroke-dasharray: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+}

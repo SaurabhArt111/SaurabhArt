@@ -7,6 +7,12 @@
   --accent: #7552c7;
   --panel: #e8e4dc;
 
+  /* particle tints for this frame (r,g,b — parsed by lib/particles.js) */
+  --fx-dot: 26, 26, 30;
+  --fx-accent: 117, 82, 199;
+  --fx-glow: 40, 34, 60;
+  --fx-veil: 0.55;
+
   --hero-p: 0;
   transition: background 0.4s ease, color 0.4s ease;
   height: 205vh;
@@ -26,6 +32,11 @@
   --soft: #18181a;
   --accent: #9d84e8;
   --panel: #1c1c1e;
+
+  --fx-dot: 240, 238, 233;
+  --fx-accent: 157, 132, 232;
+  --fx-glow: 255, 255, 255;
+  --fx-veil: 0.75;
 }
 
 .sm-character-layer {

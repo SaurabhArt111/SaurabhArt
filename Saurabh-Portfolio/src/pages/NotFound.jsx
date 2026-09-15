@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import AmbientParticles from "../components/fx/AmbientParticles";
 import { useLang } from "../lib/i18n";
 
 export default function NotFound() {
@@ -17,6 +18,8 @@ export default function NotFound() {
         gap: 0,
       }}
     >
+      {/* the dust carries across every route, including the dead ends */}
+      <AmbientParticles />
       <p
         style={{
           fontSize: 12,

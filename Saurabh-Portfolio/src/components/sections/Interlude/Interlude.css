@@ -1,0 +1,143 @@
+/*  INTERLUDE — the ∞ band  */
+
+.intl-interlude {
+  /* the particle field wants more contrast than the page's paper white, so
+     this frame goes dark in BOTH themes — it reads as a held breath, and
+     the dust is legible against it */
+  --intl-bg: #0b0b0e;
+  --intl-ink: #f2f0eb;
+  --intl-muted: #8d8a83;
+
+  /* fx tokens consumed by the canvas (r,g,b triplets — see lib/particles) */
+  --fx-dot: 240, 238, 233;
+  --fx-accent: 157, 132, 232;
+  --fx-glow: 255, 255, 255;
+
+  position: relative;
+  height: 100%;
+  min-height: 100svh;
+  display: grid;
+  background: var(--intl-bg);
+  color: var(--intl-ink);
+  overflow: hidden;
+}
+
+/* the dial and thread inherit these rather than the page palette */
+.intl-interlude {
+  --ink: var(--intl-ink);
+  --accent: #9d84e8;
+  --line: rgba(242, 240, 235, 0.14);
+}
+
+.intl-inner {
+  position: relative;
+  width: 100%;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: clamp(72px, 9vh, 120px) clamp(20px, 4vw, 56px);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: clamp(18px, 3vh, 40px);
+}
+
+.intl-head {
+  position: relative;
+  z-index: 2;
+  max-width: 44ch;
+  display: grid;
+  gap: 14px;
+}
+
+.intl-kicker {
+  margin: 0;
+  font: 11px/1 "DM Mono", monospace;
+  letter-spacing: 0.08em;
+  color: var(--intl-muted);
+}
+
+.intl-h2 {
+  margin: 0;
+  font-size: clamp(30px, 4.6vw, 62px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+.intl-serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.intl-lede {
+  margin: 0;
+  max-width: 52ch;
+  font-size: clamp(14px, 1.15vw, 17px);
+  line-height: 1.6;
+  color: var(--intl-muted);
+}
+
+/* the field spans the whole frame and sits behind the copy — the words are
+   readable over the sparse edges of the stream, and the dense middle of the
+   ∞ lands in the empty centre of the layout */
+.intl-field {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.intl-field>* {
+  height: 100%;
+}
+
+.intl-dial {
+  position: absolute;
+  right: clamp(12px, 3vw, 56px);
+  bottom: clamp(56px, 9vh, 104px);
+  z-index: 2;
+  opacity: 0.6;
+}
+
+.intl-legend {
+  position: relative;
+  z-index: 2;
+  align-self: end;
+  margin: 0;
+  max-width: 34ch;
+  font: 11px/1.5 "DM Mono", monospace;
+  letter-spacing: 0.04em;
+  color: var(--intl-muted);
+}
+
+@media (max-width: 1000px) {
+  .intl-interlude {
+    min-height: 92svh;
+  }
+
+  .intl-inner {
+    grid-template-rows: auto 46svh auto;
+  }
+
+  /* on mobile the frame is no longer sticky/full-bleed, so the field takes
+     a defined slice of the flow instead of the whole box */
+  .intl-field {
+    position: relative;
+    inset: auto;
+    grid-row: 2;
+  }
+
+  .intl-dial {
+    width: 96px;
+    bottom: auto;
+    top: clamp(64px, 12vh, 120px);
+    opacity: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intl-field {
+    position: relative;
+    inset: auto;
+  }
+}

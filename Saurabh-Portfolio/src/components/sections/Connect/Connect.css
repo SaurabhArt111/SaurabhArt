@@ -171,8 +171,33 @@
 }
 
 /* ---------- footer ---------- */
+/* ---------- closing particle band ---------- */
+
+.conn-signoff {
+  position: relative;
+  margin: clamp(64px, 9vw, 120px) auto 0;
+  max-width: var(--max);
+  padding: 0 clamp(16px, 4vw, 44px);
+  /* the particles are faint by design; the band is tall enough that the
+     sentence has room to scatter without clipping */
+  height: clamp(150px, 20vw, 230px);
+}
+
+.conn-signoff .fx-morph {
+  min-height: 0;
+}
+
+.conn-signoff-note {
+  margin: 10px auto 0;
+  max-width: 44ch;
+  text-align: center;
+  font: 11px/1.6 "DM Mono", monospace;
+  letter-spacing: 0.05em;
+  color: var(--ink-3);
+}
+
 .conn-footer {
-  margin-top: 96px;
+  margin-top: 64px;
   border-top: 1px solid var(--line);
   display: flex;
   align-items: center;

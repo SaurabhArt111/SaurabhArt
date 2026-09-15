@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import TunnelType from "../components/lab/TunnelType";
+import AmbientParticles from "../components/fx/AmbientParticles";
 import { useLang } from "../lib/i18n";
 
 function LabBar() {
@@ -54,6 +55,8 @@ export default function TunnelLab() {
       }}
     >
       <LabBar />
+      {/* lighter here — the tunnel is already busy */}
+      <AmbientParticles density={0.5} opacity={0.35} />
 
       <div style={{ flex: 1, minHeight: 0 }}>
         <TunnelType text="SAURABH" />

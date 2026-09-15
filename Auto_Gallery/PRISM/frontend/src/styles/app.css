@@ -1,0 +1,143 @@
+/* PRISM gallery refinement: variable-height media, true click targets, Fi icons. */
+#root{height:100%;position:relative;z-index:1}.main{z-index:500}.page{display:block}
+.setting-select{background:var(--glass);border:1px solid var(--border);color:var(--text2);font-size:12px;padding:6px 10px;border-radius:9px;font-family:var(--font);outline:none;cursor:pointer}.setting-select option{background:var(--bg2);color:var(--text)}
+
+/* Images: fixed column width, natural image height. No forced card/image height. */
+.img-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(205px,1fr));gap:14px;align-items:start}
+.img-grid.lg{grid-template-columns:repeat(auto-fill,minmax(275px,1fr));gap:16px}
+.img-grid .img-card{height:auto;min-height:0}
+.img-grid.lst{display:flex;flex-direction:column;gap:8px}
+.img-grid.lst .img-card{height:70px}
+.img-grid.lst .img-card img{height:48px;width:78px;object-fit:cover}
+
+/* Videos: stable 16:9 thumbnail; card body follows content. */
+.vid-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:16px;align-items:start}
+.vid-grid.lg{grid-template-columns:repeat(auto-fill,minmax(350px,1fr));gap:18px}
+.vid-grid.lst{grid-template-columns:1fr}
+.vid-card{min-height:0;content-visibility:auto;contain-intrinsic-size:320px}
+.vid-thumb video{width:100%;height:100%;object-fit:cover}
+.vid-play{cursor:pointer}
+
+/* Make the whole card an obvious open target. */
+.img-card,.vid-card{cursor:pointer}
+.img-card:focus-visible,.vid-card:focus-visible{outline:2px solid rgba(201,168,76,.65);outline-offset:3px}
+.img-media{position:relative;line-height:0;background:var(--bg3)}
+.img-media img{display:block;width:100%;height:auto;max-width:100%;object-fit:contain}
+.img-open{position:absolute;inset:auto 12px 12px auto;display:flex;opacity:0;transform:translateY(4px);transition:.18s var(--ease);pointer-events:none}
+.img-open span{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(8,10,14,.72);backdrop-filter:blur(10px);font-size:11px;color:#fff}
+.img-card:hover .img-open{opacity:1;transform:none}
+.img-card-info{padding:10px 11px 12px;background:linear-gradient(180deg,var(--bg2),rgba(13,16,24,.96))}
+.img-meta,.vid-meta{font-size:10px;color:var(--text3);margin-top:4px;letter-spacing:.25px}
+.img-card .img-overlay{pointer-events:none}.img-card .img-overlay .img-acts{pointer-events:auto}
+.quick-fav svg,.nav-ico svg,.icon-btn svg,.tab-btn svg,.search-ico,.img-act svg,.vid-act svg,.vid-star svg,.modal-act-btn svg,.modal-close svg,.lb-close-btn svg,.lb-nav svg{width:14px;height:14px;stroke-width:1.8}
+.nav-ico{display:flex;align-items:center;justify-content:center}
+.topbar-tabs .tab-btn{display:inline-flex;align-items:center;gap:6px}
+
+.trending-scroll{min-height:100px}.modal-bg.open,.lightbox.open{display:flex}.empty{grid-column:1/-1}.modal-video-wrap video{max-height:70vh}.hero-stat{cursor:default}.section-sub .section-hd{align-items:center}.section-sub .section-hd .chip{margin-left:auto}
+
+@media(max-width:1100px){.img-grid{grid-template-columns:repeat(auto-fill,minmax(185px,1fr))}.img-grid.lg{grid-template-columns:repeat(auto-fill,minmax(245px,1fr))}}
+@media(max-width:768px){
+  .img-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.img-grid.lg{grid-template-columns:1fr}.vid-grid,.vid-grid.lg{grid-template-columns:1fr}
+  .hero-title{font-family:var(--font);letter-spacing:4px}.topbar-right .icon-btn{width:32px;height:32px}.img-grid.lst .img-card{height:64px}
+}
+.collection-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:14px}.collection-sub{font-size:11px;color:var(--text3);margin-top:4px;letter-spacing:.2px}.stat-card-ico,.stat-card-ico svg{display:flex;align-items:center;width:22px;height:22px;stroke-width:1.7}.view-btn svg{width:15px;height:15px}.view-btn:nth-child(2) svg{transform:scale(1.18)}.view-btn:nth-child(3) svg{transform:scale(.9)}
+.img-card{content-visibility:auto;contain-intrinsic-size:420px 300px}.img-media{overflow:hidden}.img-vignette{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.42),transparent 38%);pointer-events:none}.img-card:hover .img-vignette{background:linear-gradient(to top,rgba(0,0,0,.58),transparent 55%)}
+.quick-fav{z-index:4}.img-open{z-index:3}.img-overlay{z-index:2}.img-card-info{position:relative;z-index:2}.img-name{line-height:1.3}.vid-shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.25),transparent 45%);pointer-events:none}.vid-play svg{width:28px;height:28px;stroke-width:1.4}
+@media(max-width:768px){.collection-head{align-items:flex-start}.collection-sub{font-size:10px}.img-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* PRISM UX v2 — masonry gallery, lower media pressure, clearer controls */
+:root{--ui-border:rgba(255,255,255,.09);--ui-border-hi:rgba(255,255,255,.16)}
+button{font-family:var(--font)}
+
+/* Pinterest-style image masonry: flex columns, natural image height. */
+.img-grid.masonry{display:flex;align-items:flex-start;gap:12px;width:100%;}
+.img-grid.masonry .img-col{display:flex;flex:1 1 0;flex-direction:column;gap:12px;min-width:0;}
+.img-grid.masonry.lg{gap:14px}
+.img-grid.masonry.lg .img-col{gap:14px}
+.img-grid.masonry .img-card{width:100%;height:auto;min-height:0;break-inside:avoid;}
+.img-grid.masonry .img-media{height:auto;aspect-ratio:auto;}
+.img-grid.masonry .img-media img{width:100%;height:auto;min-height:0;object-fit:contain;}
+.img-grid.masonry .img-card-info{min-height:55px;padding:10px 11px 11px;}
+.img-grid.masonry .img-name{font-size:12px;line-height:1.25;}
+
+/* Cleaner, more premium chips and controls. */
+.filter-bar{gap:7px;padding:2px 0 16px;align-items:center;}
+.chip,.view-btn,.setting-select,.btn-action{transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease,box-shadow .18s ease;}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;border-radius:10px;}
+.chip:hover,.view-btn:hover,.btn-action:hover{transform:translateY(-1px);border-color:var(--ui-border-hi);box-shadow:0 6px 18px rgba(0,0,0,.18)}
+.chip.active{box-shadow:0 0 0 1px rgba(201,168,76,.08),0 5px 18px rgba(201,168,76,.08);}
+.view-btn{width:34px;height:32px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;}
+
+/* Make media opening intent obvious without covering the whole image. */
+.img-open span{padding:7px 10px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.28);}
+.img-card:active,.vid-card:active{transform:translateY(0) scale(.995);}
+.img-card:focus-visible,.vid-card:focus-visible{outline:2px solid rgba(201,168,76,.8);outline-offset:3px;}
+
+/* Videos: never mount/play full media in the gallery. The modal loads the real file.
+   This avoids accumulating hundreds of MB in the browser cache from hover previews. */
+.vid-poster{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:rgba(255,255,255,.55);background:
+  radial-gradient(circle at 50% 35%,rgba(201,168,76,.12),transparent 38%),
+  linear-gradient(145deg,rgba(255,255,255,.045),rgba(255,255,255,.012));}
+.vid-poster svg{width:30px;height:30px;stroke-width:1.35;color:var(--gold);}
+.vid-poster span{font-size:9px;letter-spacing:1.8px;font-weight:700;color:var(--text3);}
+.vid-play{z-index:3;width:46px;height:46px;inset:50% auto auto 50%;transform:translate(-50%,-50%);border-radius:50%;background:rgba(7,9,13,.72);border:1px solid rgba(255,255,255,.15);backdrop-filter:blur(8px);opacity:1;box-shadow:0 10px 28px rgba(0,0,0,.35);}
+.vid-play svg{width:19px;height:19px;color:#fff;}
+.vid-card:hover .vid-play{background:rgba(201,168,76,.9);color:#050505;transform:translate(-50%,-50%) scale(1.06);}
+.vid-card:hover .vid-play svg{color:#080808;}
+.vid-card:hover .vid-poster{background:radial-gradient(circle at 50% 35%,rgba(201,168,76,.18),transparent 38%),linear-gradient(145deg,rgba(255,255,255,.055),rgba(255,255,255,.012));}
+
+/* Reduce rendering work for offscreen cards while keeping images browser-lazy. */
+.img-card{content-visibility:auto;contain-intrinsic-size:360px 300px;}
+.vid-card{content-visibility:auto;contain-intrinsic-size:320px 230px;}
+
+/* Better action buttons. */
+.img-act,.vid-act,.quick-fav{touch-action:manipulation;}
+.img-act{width:32px;height:32px;border-radius:9px;}
+.vid-act{height:30px;padding:0 10px;border-radius:8px;}
+.quick-fav{width:30px;height:30px;}
+
+/* Collection header hierarchy. */
+.collection-head{padding-bottom:3px;}
+.collection-title{letter-spacing:-.25px;}
+.collection-sub{opacity:.78;}
+.section-count{font-variant-numeric:tabular-nums;}
+
+@media(max-width:900px){
+  .img-grid.masonry{gap:9px}.img-grid.masonry .img-col{gap:9px}
+  .img-grid.masonry.lg{gap:10px}.img-grid.masonry.lg .img-col{gap:10px}
+}
+@media(max-width:620px){
+  .filter-bar{overflow-x:auto;flex-wrap:nowrap;padding-bottom:12px;scrollbar-width:none}.filter-bar::-webkit-scrollbar{display:none}
+  .filter-bar>*{flex:0 0 auto}.section-count{display:none}
+}
+
+/* Gallery v3: consistent flex-masonry for images + videos */
+.img-grid.masonry,.vid-grid.masonry{display:flex;align-items:flex-start;width:100%;}
+.img-grid.masonry .img-col,.vid-grid.masonry .vid-col{display:flex;flex:1 1 0;flex-direction:column;min-width:0;}
+.img-grid.masonry .img-card,.vid-grid.masonry .vid-card{width:100%;}
+.vid-grid.masonry{gap:12px;}
+.vid-grid.masonry .vid-col{gap:12px;}
+.vid-grid.masonry.lg{gap:14px;}
+.vid-grid.masonry.lg .vid-col{gap:14px;}
+.vid-grid.masonry .vid-card{min-width:0;}
+
+/* Lightweight video cards: the actual video is fetched only inside the modal. */
+.vid-thumb{aspect-ratio:16/9;}
+.vid-poster{z-index:1;}
+.vid-shade{z-index:2;}
+
+/* Small icon-led section labels instead of emoji headings. */
+.section-icon-title{display:inline-flex;align-items:center;gap:7px;}
+.section-icon-title svg{width:15px;height:15px;stroke-width:1.7;color:var(--gold);}
+
+/* Trend strip also avoids loading video files just to create thumbnails. */
+.trend-poster{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle at 50% 35%,rgba(201,168,76,.14),transparent 45%),linear-gradient(145deg,rgba(255,255,255,.05),rgba(255,255,255,.012));}
+.trend-poster svg{width:24px;height:24px;color:var(--gold);stroke-width:1.4;}
+.trend-play{z-index:2;}
+
+/* Better top-level controls */
+.icon-btn,.tab-btn,.nav-item{user-select:none;}
+.icon-btn:focus-visible,.tab-btn:focus-visible,.nav-item:focus-visible,.chip:focus-visible,.view-btn:focus-visible,.btn-action:focus-visible{outline:2px solid rgba(201,168,76,.72);outline-offset:2px;}
+
+@media(max-width:900px){.vid-grid.masonry,.img-grid.masonry{gap:9px}.vid-grid.masonry .vid-col,.img-grid.masonry .img-col{gap:9px}}
+@media(max-width:620px){.vid-grid.masonry,.img-grid.masonry{gap:7px}.vid-grid.masonry .vid-col,.img-grid.masonry .img-col{gap:7px}}

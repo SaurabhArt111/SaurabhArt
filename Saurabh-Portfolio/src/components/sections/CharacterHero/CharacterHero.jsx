@@ -1,5 +1,6 @@
 
 import { useEffect, useRef, useState } from "react";
+import AmbientParticles from "../../fx/AmbientParticles";
 import ParticleTitle from "./ParticleTitle";
 import heroProgress from "../../../lib/heroProgress";
 import "./CharacterHero.css";
@@ -117,6 +118,10 @@ export default function CharacterHero() {
       </div>
 
       <div className="sm-particle-layer" aria-hidden="true">
+        {/* denser dust here than the rest of the site: the opening frame is
+            mostly empty space, and the wordmark should look like it
+            condensed out of the same field it sits in */}
+        <AmbientParticles variant="inset" density={1.7} />
         <ParticleTitle progressRef={heroProgress} />
       </div>
 

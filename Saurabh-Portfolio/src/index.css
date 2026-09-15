@@ -132,6 +132,9 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -moz-tap-highlight-color: transparent;
+  -ms-tap-highlight-color: transparent;
 }
 
 html {
@@ -188,6 +191,14 @@ body {
 img {
   max-width: 100%;
   display: block;
+}
+
+/* drawn SVG dividers between the closing sections — see fx/SvgFlourish */
+.fx-divider {
+  max-width: var(--max);
+  margin: clamp(8px, 2vw, 28px) auto;
+  padding: 0 clamp(16px, 4vw, 44px);
+  opacity: 0.9;
 }
 
 .finalFrame {

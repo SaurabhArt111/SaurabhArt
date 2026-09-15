@@ -1,0 +1,49 @@
+/*  AMBIENT PARTICLES — site-wide dust  */
+
+/* FX colour tokens. Canvases can't read hex from CSS usefully, so these are
+   plain `r, g, b` triplets that lib/particles.js parses. Declared here at
+   :root so every fx component inherits a sane default, then overridden
+   locally by any section that wants its own tint. */
+:root {
+  --fx-dot: 20, 20, 22;
+  --fx-accent: 255, 46, 15;
+  --fx-glow: 20, 20, 22;
+  --fx-veil: 0.5;
+}
+
+:root[data-theme="dark"] {
+  --fx-dot: 230, 237, 243;
+  --fx-accent: 255, 106, 77;
+  --fx-glow: 255, 255, 255;
+  --fx-veil: 0.62;
+}
+
+.fx-ambient {
+  display: block;
+  pointer-events: none;
+  opacity: var(--fx-veil);
+}
+
+/* sits above the stacked opaque scenes, below the nav (z 90) and any
+   modal (z 300) */
+.fx-ambient-fixed {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 40;
+}
+
+.fx-ambient-inset {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-ambient {
+    display: none;
+  }
+}

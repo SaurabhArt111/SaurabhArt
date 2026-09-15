@@ -1,0 +1,126 @@
+/*  SCROLL PROGRESS RING  */
+
+.fx-ring {
+  position: fixed;
+  right: max(18px, 2vw);
+  bottom: max(18px, 2vw);
+  z-index: 80;
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--panel-glass);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  color: var(--ink-2);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px) scale(0.92);
+  transition: opacity 0.45s ease, transform 0.6s var(--ease-out-expo),
+    visibility 0s linear 0.45s;
+}
+
+.fx-ring-on {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 0.45s ease, transform 0.6s var(--ease-out-expo),
+    visibility 0s linear 0s;
+}
+
+.fx-ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* 12 o'clock start */
+  transform: rotate(-90deg);
+}
+
+.fx-ring-track {
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.fx-ring-arc {
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  transition: stroke 0.3s ease;
+}
+
+.fx-ring-num,
+.fx-ring-arrow {
+  transition: opacity 0.25s ease, transform 0.35s var(--ease-out-expo);
+}
+
+.fx-ring-num {
+  font-family: "DM Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.fx-ring-num b {
+  font-weight: 500;
+}
+
+.fx-ring-num::after {
+  content: "%";
+  opacity: 0.5;
+  font-size: 8px;
+}
+
+.fx-ring-arrow {
+  position: absolute;
+  font-style: normal;
+  font-size: 15px;
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.fx-ring:hover,
+.fx-ring:focus-visible {
+  color: var(--ink);
+}
+
+.fx-ring:hover .fx-ring-num,
+.fx-ring:focus-visible .fx-ring-num {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.fx-ring:hover .fx-ring-arrow,
+.fx-ring:focus-visible .fx-ring-arrow {
+  opacity: 1;
+  transform: none;
+}
+
+.fx-ring:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 780px) {
+  .fx-ring {
+    width: 44px;
+    height: 44px;
+  }
+
+  .fx-ring-num {
+    font-size: 9px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .fx-ring,
+  .fx-ring-num,
+  .fx-ring-arrow,
+  .fx-ring-arc {
+    transition: none;
+  }
+}

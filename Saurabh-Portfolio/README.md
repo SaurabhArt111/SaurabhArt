@@ -25,8 +25,9 @@ npm run preview   # preview the production build
    "ARTIST · DESIGNER · DEVELOPER" over the first slice of the scroll.
    Hovering repels nearby particles; pressing and dragging orbits the whole
    field in a hand-rolled 3D projection (no WebGL needed for a few thousand
-   points). Reduced-motion visitors get the original static heading instead
-   — see `ParticleTitle.jsx`'s early return.
+   points). **Hovering a word makes it breathe along its width** — see the
+   particle layer section below. Reduced-motion visitors get the original
+   static heading instead — see `ParticleTitle.jsx`'s early return.
 2. **Hero** — "Interfaces that feel obvious. Code that just works." The nav
    is invisible until this section is reached (see Nav below).
 3. **About** — Saurabh's real bio.
@@ -42,8 +43,16 @@ npm run preview   # preview the production build
    `image` yet render as a tinted placeholder with a small animated SVG
    doodle rather than a broken image, so the section still looks intentional
    before real art is dropped in.
-7. **Connect** — Saurabh's real GitHub, LinkedIn and Instagram, with Feather
-   (react-icons/fi) brand marks.
+7. **Interlude — the ∞ band** (`components/sections/Interlude`) — a held
+   breath between the work and the offer. One moving object: a few thousand
+   particles streaming around a figure-eight, which gather into
+   "ARTIST · DESIGNER · DEVELOPER" as you scroll through the frame and let
+   go again on the way out. Scrubbable — stop halfway and the sentence stays
+   half-formed. No path is ever drawn; the ∞ exists only as particles.
+8. **Connect** — Saurabh's real GitHub, LinkedIn and Instagram, with Feather
+   (react-icons/fi) brand marks. Closes on the same three words as the
+   opening, in the same dust, held still — cursor through them and they slip
+   back into the ∞ stream.
 
 ## Adding content — no code changes needed
 
@@ -59,6 +68,7 @@ src/
   components/
     layout/       Nav, Scene, ThemeToggle, SmoothScroll
     ui/           Button, VelocityMarquee
+    fx/           the particle + SVG motion layer (see below)
     sections/
       CharacterHero/  opening cover + ParticleTitle (the galaxy-to-text name)
       Hero/           "Interfaces that feel obvious..." — nav reveals here
@@ -66,11 +76,13 @@ src/
       Stack/          "My Design Stack" orbit
       Work/           featured work, WorkPreview mockups, ProjectModal
       Gallery/        art & design grid + lightbox
+      Interlude/      the ∞ particle band, mid-page
       Connect/
     lab/          TunnelType (used only by the /tunnel route)
   content/        static data that isn't project/gallery content (e.g. stack.js)
   data/           projects.json, gallery.json, README.md (schema + how-to)
-  lib/            gsap setup, lenis helpers, i18n (English copy), theme, scene helper
+  lib/            gsap setup, lenis helpers, i18n (English copy), theme, scene helper,
+                  particles.js (shared canvas plumbing)
   pages/          Home, TunnelLab, NotFound
   App.jsx         route definitions
   main.jsx        app entry (ThemeProvider + LanguageProvider + router)
@@ -79,6 +91,92 @@ public/
   character/      the hero-sequence frames
   images/         icons + issuer logos
 ```
+
+## The particle & SVG motion layer
+
+Everything canvas-based shares one module, `src/lib/particles.js`: palette
+reading, text sampling, the ∞ maths, and a frame loop. The components on top
+of it stay about motion rather than bookkeeping.
+
+**`fx/AmbientParticles`** — the dust over every page. Deliberately almost
+invisible. One fixed instance per route, painted above the stacked scenes
+(each scene has an opaque background, so a layer *behind* them would never be
+seen) and below the nav; a denser instance lives inside the opening frame.
+Dots drift on individual orbits rather than a shared direction, and **scroll
+velocity smears them** into faint vertical streaks that settle when you stop
+— the effect answers what the reader is doing instead of looping regardless.
+
+**`sections/CharacterHero/ParticleTitle`** — the wordmark, in three states.
+
+*Assembling*: particles fly in from a scattered shell across the first slice
+of the hero scroll.
+
+*Resting*: every dot travels. A wordmark parked on fixed pixels is a stencil
+— legible but dead — so at rest each particle rides a conveyor along its own
+row of the letterforms, left to right, wrapping at the end, with an orbital
+wobble, a shimmer wave crossing the width, a few embers that wander out of
+the strokes, and a slow 3D drift over the top. Two things about that flow
+were only found by simulating ten minutes of playback (`buildFlowRows` and
+`advanceFlow` in `lib/particles.js` carry the full notes): a random-walk
+migration drains the dust into a pile — 58% left/right skew, the letters
+visibly rotting — where beads on a per-row loop keep coverage even *by
+construction*; and the gap between one letter's stem and the next must be
+skipped rather than travelled, or the dots paint dust in the air between
+letters. Budgeting particles by widening the sample stride, rather than
+thinning a dense sample, is what keeps neighbouring slots actually
+neighbouring so that gap test can work at all.
+
+*Hovered*: the word breathes along its width —
+the letterforms stretch past the edges of the screen, squash vertically as
+they widen (a wide thing has to give somewhere), ripple outward from the
+centre, split into two colour-offset copies, bank in 3D, and streak while
+they travel — then collapse back and do it again. The warp is applied to the
+*flowing* position, so the current keeps running underneath the stretch
+rather than freezing during it. The warp is driven by each
+particle's normalised position *inside its own word* (`u` = -1 at the left
+edge, +1 at the right), so outer letters travel furthest and the middle
+barely moves. That's what makes it read as one elastic object rather than a
+few thousand unrelated dots drifting apart. Clicking fires a shockwave ring;
+dragging still orbits the field.
+
+**`fx/ParticleMorph`** — one field with two states and a blend between them.
+At `0` the particles ride a lemniscate of Gerono as a continuous stream:
+dense at the path, thinning outward, streaking along the direction of travel,
+the whole ribbon tilted and swinging slowly so the two loops pass in front of
+and behind each other. At `1` the same particles settle onto the pixels of a
+line of type. Anything between reads as the sentence dissolving into the
+stream. The mid-page band scrubs that value with scroll; the closing band
+sits at `1` and scatters back to flow under the cursor.
+
+**`fx/SvgFlourish`** — two pieces of vector motion, both reporting something
+rather than decorating. `orbit` is a dial of rings turning at different rates
+with a marker on each, used beside the ∞ band where the subject *is*
+continuous motion; it's pure CSS rotation of grouped geometry, so it needs no
+SMIL. `thread` is a divider that draws itself as you scroll past, with a
+marker riding the curve it has drawn — the stroke's progress is the section
+boundary being crossed.
+
+**`fx/ScrollProgressRing`** — an SVG arc whose `stroke-dashoffset` tracks
+document progress, with the percentage in the middle; the arc *is* the
+reading position. Doubles as back-to-top through the site's existing anchor
+handling. Hidden through the opening sequence, on the same rule as the nav.
+
+### Cost control
+
+- Every canvas parks its `requestAnimationFrame` loop when it scrolls off
+  screen or the tab is hidden (`createVisibleLoop`) — a dozen idle fields on
+  a page this long would quietly drain a laptop.
+- `dt` is normalised to 60fps and clamped, so motion runs at the same speed
+  on a 144Hz display and a backgrounded tab can't resume with one huge jump.
+- Particle budgets and device-pixel-ratio are both capped, and roughly
+  halved on phone widths. Sub-pixel dots draw as `fillRect` rather than
+  `arc()`, and trails batch into a single stroked path per frame.
+- Colours come from CSS custom properties as `r,g,b` triplets, so the fields
+  re-tint themselves when the theme flips and every colour decision stays in
+  the stylesheet. Type is re-sampled once `document.fonts.ready` resolves, so
+  the particles trace Manrope rather than the fallback face.
+- `prefers-reduced-motion` removes all of it: the ambient field returns
+  `null`, and both morph bands and the wordmark fall back to real text.
 
 ## Notes
 

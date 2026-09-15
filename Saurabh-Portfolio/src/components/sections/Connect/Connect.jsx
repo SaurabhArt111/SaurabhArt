@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { FiLinkedin, FiGithub, FiInstagram, FiArrowUpRight, FiArrowUp } from "react-icons/fi";
 import { gsap, EASE, prefersReducedMotion } from "../../../lib/gsap";
 import Button from "../../ui/Button";
+import ParticleMorph from "../../fx/ParticleMorph";
 import "./Connect.css";
 import { useLang } from "../../../lib/i18n";
 
@@ -21,6 +22,8 @@ const styles = {
   "arrow": "conn-arrow",
   "footer": "conn-footer",
   "top": "conn-top",
+  "signoff": "conn-signoff",
+  "signoffNote": "conn-signoff-note",
 };
 
 /* react-icons/fi (Feather) — swapped in for the hand-rolled brand svgs */
@@ -116,6 +119,19 @@ export default function Connect() {
             <span className={styles.arrow}><FiArrowUpRight aria-hidden="true" /></span>
           </a>
         ))}
+      </div>
+
+      {/* closing band — the same three words the page opened with, made of
+          the same dust, held still this time. Cursor through them and they
+          slip back into the ∞ stream from the interlude. */}
+      <div className={styles.signoff}>
+        <ParticleMorph
+          morph="text"
+          hoverEffect="scatter"
+          count={1300}
+          label="Artist, designer, developer"
+        />
+        <p className={styles.signoffNote}>{t("connect.signoff")}</p>
       </div>
 
       <footer className={styles.footer}>
