@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+  <title>Gargantua: a rotating black hole</title>
+  <meta name="description"
+    content="Real time relativistic rendering of a rotating supermassive black hole: null geodesics traced through Kerr spacetime, a volumetric accretion flow, gravitational lensing and relativistic beaming.">
+  <meta name="theme-color" content="#000000">
+  <meta property="og:title" content="Gargantua: a rotating black hole">
+  <meta property="og:description"
+    content="Null geodesics traced through Kerr spacetime in real time, with a volumetric accretion flow, gravitational lensing and relativistic beaming.">
+  <!-- Inline so the page stays a single self contained file and never requests a
+     favicon: the edge on disk and the shadow it wraps around. -->
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23000'/><ellipse cx='16' cy='16' rx='13.5' ry='4.6' fill='none' stroke='%23e2661b' stroke-width='3'/><circle cx='16' cy='16' r='6.4' fill='%23000'/></svg>">
+  <style>
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: none;
+      cursor: default
+    }
+
+    canvas {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+      opacity: 0;
+      transition: opacity 1400ms cubic-bezier(.4, 0, .2, 1)
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="v"></canvas>
+  <script>
+    "use strict";
+    (function () {
+
+      /* ==========================================================================
+         Kerr black hole — relativistic geodesic renderer
+         Spin a/M = 0.9, geometric units M = 1, Kerr-Schild Cartesian coordinates.
+         ========================================================================== */
+
+      var SPIN = 0.9;
+      var R_H = 1.0 + Math.sqrt(1.0 - SPIN * SPIN);           // outer horizon
+      var Z1 = 1.0 + Math.pow(1.0 - SPIN * SPIN, 1 / 3) * (Math.pow(1 + SPIN, 1 / 3) + Math.pow(1 - SPIN, 1 / 3));
+      var Z2 = Math.sqrt(3.0 * SPIN * SPIN + Z1 * Z1);
+      var R_ISCO = 3.0 + Z2 - Math.sqrt((3.0 - Z1) * (3.0 + Z1 + 2.0 * Z2));
+      var R_IN = R_ISCO;
+      var R_OUT = 30.0;
+      function ntFlux(r) { var x = Math.sqrt(R_IN / r); return Math.max(1.0 - x, 0.0) / (r * r * r); }
+      var NT_MAX = ntFlux(1.36111 * R_IN);
+
+      /* rendering / grading constants */
+      var TUNE = {
+        fov: 36.0,   /* vertical field of view, degrees        */
+        tPeak: 8200.0, /* peak effective disk temperature, K     */
+        beam: 3.25,   /* relativistic beaming exponent          */
+        diskGain: 0.62,   /* disk radiance scale                    */
+        corona: 0.105,  /* hot inner flow radiance scale          */
+        skyGain: 1.0,    /* background radiance scale              */
+        exposure: 1.06,
+        evTarget: 0.120,  /* photographic adaptation target luminance */
+        bloom: 0.050,
+        vignette: 0.09
+      };
+
+      var canvas = document.getElementById("v");
+      var gl = canvas.getContext("webgl2", {
+        alpha: false, antialias: false, depth: false, stencil: false,
+        premultipliedAlpha: false, preserveDrawingBuffer: false,
+        powerPreference: "high-performance", desynchronized: false
+      });
+      if (!gl) { document.body.style.background = "#000"; return; }
+
+      var extF = gl.getExtension("EXT_color_buffer_float");
+      var extHF = gl.getExtension("EXT_color_buffer_half_float");
+      gl.getExtension("OES_texture_float_linear");
+      var HDRFMT = (extF || extHF) ? gl.RGBA16F : gl.RGBA8;
+      var HDRTYPE = (extF || extHF) ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+
+      /* ---------------------------------------------------------------- shaders */
+
+      var VS = `#version 300 es
+void main(){
+  vec2 p = vec2(float((gl_VertexID & 1) << 2) - 1.0, float((gl_VertexID & 2) << 1) - 1.0);
+  gl_Position = vec4(p, 0.0, 1.0);
+}`;
+
+      var FS_MAIN = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler3D;
+out vec4 oCol;
+
+uniform vec2  uRes;
+uniform vec2  uJit;
+uniform float uTime;
+uniform vec3  uCam;
+uniform mat3  uBasis;
+uniform float uTanHalf;
+uniform float uSpin;
+uniform int   uSteps;
+uniform int   uQual;
+uniform float uStepK;
+uniform float uEscape;
+uniform float uCamG;
+uniform float uFrameJ;
+uniform float uRIn;
+uniform float uRH;
+uniform float uROut;
+uniform float uNtMax;
+uniform float uTPeak;
+uniform float uBeam;
+uniform float uDiskGain;
+uniform float uCorona;
+uniform float uSkyGain;
+uniform int   uVolBudget;
+uniform sampler3D uNoise;
+uniform sampler2D uBB;
+
+#define TAU  6.283185307179586
+#define ITAU 0.15915494309189535
+#define PI   3.141592653589793
+
+/* How much of the march step length counts toward the density LOD footprint.
+   1.0 pre-filters every octave the step cannot resolve, which is the strictly
+   correct choice but also discards detail the temporal filter could have
+   recovered; the accumulation buffer averages several jittered frames, so a
+   fraction of the step is the better operating point. */
+#define LONGF 0.42
+
+/* Turbulence regeneration. GENL is the generation lifetime in code time, chosen
+   from how far the field can be sheared before the flow reads as concentric
+   rings rather than turbulence; GENF is the fraction of a lifetime spent
+   dissolving the previous generation out, so the mean cost is 1 + GENF lookups.
+   OMREF is the rigid rotation rate, the orbital rate near r = 8, where most of
+   the visible flux sits. */
+/* Blending two uncorrelated patterns costs contrast, worst at the halfway point,
+   so the crossfade is kept short relative to the lifetime: the flow spends most
+   of its time on a single full contrast generation. */
+#define GENL  120.0
+#define GENF  0.13
+#define OMREF 0.0425
+
+/* ---------- utility ---------- */
+vec3 hash33(vec3 p){
+  p = fract(p*vec3(0.1031,0.1030,0.0973));
+  p += dot(p, p.yxz+33.33);
+  return fract((p.xxy+p.yxx)*p.zyx);
+}
+float hash13(vec3 p){
+  p = fract(p*0.1031);
+  p += dot(p, p.zyx+31.32);
+  return fract((p.x+p.y)*p.z);
+}
+vec4 nz(vec3 p){ return texture(uNoise, p)*2.0 - 1.0; }
+vec3 bb(float T){
+  float u = (log2(clamp(T,900.0,38000.0)) - 9.8137811) * 0.1851917;
+  return texture(uBB, vec2(u,0.5)).rgb;
+}
+vec3 sane(vec3 c){
+  c = vec3(c.r>=0.0?c.r:0.0, c.g>=0.0?c.g:0.0, c.b>=0.0?c.b:0.0);
+  return min(c, vec3(900.0));
+}
+
+/* ---------- Kerr-Schild geometry ---------- */
+float ksRad(vec3 q){
+  float a2 = uSpin*uSpin;
+  float rho = dot(q,q) - a2;
+  return sqrt(max(0.5*(rho + sqrt(rho*rho + 4.0*a2*q.z*q.z)), 1e-7));
+}
+
+/* Hamiltonian null-geodesic right hand side.
+   H = 0.5( eta^ab p_a p_b - f (K.p)^2 ),  g_ab = eta_ab + f k_a k_b       */
+void rhs(vec4 x, vec4 p, out vec4 dx, out vec4 dp){
+  vec3 q = x.yzw;
+  float a = uSpin, a2 = a*a;
+  float rho = dot(q,q) - a2;
+  float D  = max(sqrt(rho*rho + 4.0*a2*q.z*q.z), 1e-7);
+  float R2 = max(0.5*(rho + D), 1e-5);
+  float r  = sqrt(R2);
+  float S  = R2 + a2, iS = 1.0/S;
+  float N1 = r*q.x + a*q.y;
+  float N2 = r*q.y - a*q.x;
+  vec3  k  = vec3(N1*iS, N2*iS, q.z/r);
+  float B  = R2*R2 + a2*q.z*q.z;
+  float iB = 1.0/B;
+  float f  = 2.0*R2*r*iB;
+
+  float kp = -p.x + dot(k, p.yzw);
+  dx.x   = -p.x + f*kp;
+  dx.yzw = p.yzw - f*k*kp;
+
+  float iD = 1.0/D;
+  float ir = 1.0/r, iR2 = ir*ir;
+  vec3 dR2 = vec3(q.x*(1.0+rho*iD), q.y*(1.0+rho*iD), q.z*(1.0+(rho+2.0*a2)*iD));
+  vec3 dr  = dR2*(0.5*ir);
+  vec3 dB  = 2.0*R2*dR2 + vec3(0.0,0.0,2.0*a2*q.z);
+  vec3 df  = 3.0*r*dR2*iB - f*dB*iB;
+
+  float p1 = p.y, p2 = p.z, p3 = p.w;
+  vec3 w = dr*(q.x*iS)*p1 - dR2*(N1*iS*iS)*p1
+         + dr*(q.y*iS)*p2 - dR2*(N2*iS*iS)*p2
+         - dr*(q.z*iR2)*p3;
+  w.x += iS*(r*p1 - a*p2);
+  w.y += iS*(a*p1 + r*p2);
+  w.z += p3*ir;
+
+  dp.x   = 0.0;
+  dp.yzw = 0.5*df*kp*kp + f*kp*w;
+}
+
+void rk2(inout vec4 x, inout vec4 p, float h, out vec4 v0){
+  vec4 a1,b1,a2,b2;
+  rhs(x, p, a1, b1);
+  rhs(x + (0.5*h)*a1, p + (0.5*h)*b1, a2, b2);
+  x += h*a2; p += h*b2; v0 = a1;
+}
+void rk4(inout vec4 x, inout vec4 p, float h, out vec4 v0){
+  vec4 a1,b1,a2,b2,a3,b3,a4,b4;
+  rhs(x, p, a1, b1);
+  rhs(x + (0.5*h)*a1, p + (0.5*h)*b1, a2, b2);
+  rhs(x + (0.5*h)*a2, p + (0.5*h)*b2, a3, b3);
+  rhs(x + h*a3, p + h*b3, a4, b4);
+  x += (h/6.0)*(a1 + 2.0*a2 + 2.0*a3 + a4);
+  p += (h/6.0)*(b1 + 2.0*b2 + 2.0*b3 + b4);
+  v0 = a1;
+}
+
+/* ---------- accretion structure ---------- */
+float omega(float r){ return 1.0/(r*sqrt(r) + uSpin); }
+
+/* slow twisted warp of the outer mid-plane: the flow is not a perfect plane */
+float diskWarp(float r, float phi){
+  float w = 0.0155*r*smoothstep(6.0, 26.0, r);
+  return w*sin(phi - 0.42*log(r) - 0.0115*uTime);
+}
+float diskH(float r){
+  return r*0.0235 + 0.082*exp(-(r-uRIn)*0.55) + 0.00024*r*r;
+}
+float ntNorm(float r){
+  float rr = max(r, uRIn*1.015);
+  float x = sqrt(uRIn/rr);
+  return max(1.0-x, 0.0)/(rr*rr*rr) / uNtMax;
+}
+float tempProf(float r){
+  return uTPeak * pow(ntNorm(r), 0.25) * (1.0 - 0.575*smoothstep(uRIn+1.2, uROut*1.02, r));
+}
+float sbProf(float r){
+  return pow(ntNorm(r), 0.46) * (1.0 - 0.60*smoothstep(uROut*0.34, uROut*1.02, r));
+}
+float tauProf(float r){
+  return mix(3.20, 1.00, smoothstep(uRIn, uROut*0.95, r));
+}
+float edgeRamp(float r){
+  float m  = smoothstep(uRIn-0.09, uRIn+0.62, r);
+  float pl = 0.17*smoothstep(uRH*1.05, uRIn*0.99, r)*(1.0-m);
+  float o  = 1.0 - smoothstep(uROut*0.945, uROut*1.002, r);
+  return (m + pl)*o;
+}
+
+/* Turbulent plasma field. Log-polar, differentially sheared, domain warped.
+   Azimuthal scales are integers so the tileable noise stays seamless in phi. */
+/* The Keplerian advected octaves. These carry the full radial gradient in
+   pattern speed, so they are the only layers that actually shear and therefore
+   the only ones that need rebuilding: tl is the generation clock that drives the
+   shear and gs decorrelates one generation from the next. Feeding tl == t and
+   gs == 0 reproduces plain Keplerian advection. w is the domain warp from the
+   broad field, which is shared rather than recomputed here.
+   Returns (web * granularity, ridge strength, octave part of the hot fraction). */
+vec3 fineGen(float lr, float phi, float zn, float rig, float tl, float gs,
+             float om, vec3 w, float lod2, float lodA, float lodB){
+  float uF = fract(phi*ITAU - rig - (om - OMREF)*tl*ITAU);
+  float m2 = tl*0.0088, m3 = tl*0.019, m4 = tl*0.040;
+  vec3 go = vec3(gs*0.7548777, gs*0.5698403, gs*0.4656631);
+
+  vec4 a2 = nz(vec3((uF+w.x*0.6)*17.0, (lr+w.y*0.6)*6.30 + m2, (zn+w.z*0.55)*1.70) + vec3(0.61,0.19,0.77) + go);
+  float f2 = a2.x, g2 = a2.y*lod2, e2 = a2.w*lod2;
+
+  float f3 = 0.0, g3 = 0.0, f4 = 0.0;
+  if(lodA > 0.012 && uQual > 0){
+    vec4 a3 = nz(vec3((uF+w.x*0.35)*53.0, (lr+w.y*0.35)*19.0 + m3, (zn+w.z*0.4)*4.40) + vec3(0.23,0.67,0.41) + go);
+    f3 = a3.z*lodA; g3 = a3.w*lodA;
+    if(lodB > 0.012 && uQual > 1){
+      vec4 a4 = nz(vec3((uF+w.x*0.2)*161.0, (lr+w.y*0.2)*57.0 + m4, (zn+w.z*0.3)*12.0) + vec3(0.83,0.31,0.59) + go);
+      f4 = (a4.x*0.62 + a4.w*0.38)*lodB;
+    }
+  }
+
+  /* filamentary magnetic web: two ridged layers at different scales */
+  /* A ridge fades to its mean, not to zero: scaling the noise that feeds it
+     would drive the ridge to its crest everywhere and brighten the flow. */
+  float rid1 = max(1.0 - abs(f2*1.28), 0.0); rid1 *= rid1;
+  rid1 = mix(0.24, rid1, lod2);
+  float rid2 = max(1.0 - abs(f3*1.55), 0.0); rid2 *= rid2;
+  float web  = 0.28 + 1.00*rid1 + 0.42*rid2*(0.35+0.65*rid1);
+
+  /* granular emission cells */
+  float gran = max(1.0 + 0.72*g2 + 0.58*f4 + 0.44*g3 + 0.30*e2, 0.04);
+
+  return vec3(web*gran, rid1*0.62 + rid2*0.55, 0.38*f4 + 0.34*g3);
+}
+
+vec3 diskField(float r, float phi, float zn, float rel){
+  /* One footprint in, three octave weights out. Each octave fades as soon as
+     the sampling footprint approaches its own wavelength, so detail the march
+     cannot resolve is averaged away instead of aliasing into speckle. The
+     coefficients are in proportion to the azimuthal frequencies below. */
+  /* a2 spans 2*pi/17 in azimuth, so its wavelength is about 0.37r and it stays
+     resolvable across almost the whole flow. Only the grazing rays, whose steps
+     have been stretched by the volume budget fade, actually undersample it. */
+  float lod2 = 1.0 - smoothstep(0.34, 1.05, rel*3.4);
+  float lodA = 1.0 - smoothstep(0.34, 1.05, rel*75.8);
+  float lodB = 1.0 - smoothstep(0.34, 1.05, rel*227.0);
+  float lr = log(r);
+  float om = omega(r);
+  float t  = uTime;
+
+  /* Rigid pattern rotation, wrapped into [0,1) so the integer azimuthal
+     multipliers stay seamless and precision holds however large t has grown. */
+  float rig = fract(OMREF*t*ITAU);
+
+  /* Broad structure travels as a rigidly rotating spiral density wave pattern
+     rather than at the local orbital rate. That is standard density wave
+     behaviour, and because a rigid pattern speed has no radial gradient these
+     layers never shear: they stay coherent for as long as the page is open and
+     so need no regeneration and no second lookup. */
+  float uP = fract(phi*ITAU - rig);
+  float m0 = t*0.0021, m1 = t*0.0042;
+
+  vec4 a0 = nz(vec3(uP, lr*0.70 + m0, zn*0.26) + vec3(0.71,0.13,0.47));
+  float f0 = a0.x, g0 = a0.y;
+
+  /* the coarse field also drives the domain warp for the finer octaves */
+  vec3 w = vec3(a0.z*0.019, a0.w*0.055, (a0.x + a0.w)*0.19);
+
+  vec4 a1 = nz(vec3((uP+w.x)*3.0, (lr+w.y)*2.10 + m1, (zn+w.z)*0.62) + vec3(0.53,0.37,0.91));
+  float f1 = a1.z, g1 = a1.w;
+
+  /* large scale organisation */
+  float bse = max(0.34 + 0.74*f0 + 0.56*f1, 0.0);
+
+  /* The Keplerian layers do shear, without bound: left alone, a few hundred time
+     units of winding turns the turbulence into smooth concentric rings. Real
+     turbulence is regenerated on roughly an orbital timescale, so those layers
+     are rebuilt in overlapping generations. The young generation advects from
+     zero shear while the previous one, already GENL further wound, dissolves
+     out. The branch is a function of time alone, so every invocation in a frame
+     takes the same path: no divergence, and the second lookup is only paid for
+     during the crossfade. */
+  float sc = t/GENL;
+  float gi = floor(sc);
+  float tY = t - gi*GENL;
+  float wOld = 1.0 - smoothstep(0.0, GENF, sc - gi);
+
+  vec3 F = fineGen(lr, phi, zn, rig, tY, gi, om, w, lod2, lodA, lodB);
+  if(wOld > 0.003)
+    F = mix(F, fineGen(lr, phi, zn, rig, tY + GENL, gi - 1.0, om, w, lod2, lodA, lodB), wOld);
+
+  float dens = bse*F.x*2.05;
+  float rid  = F.y;
+  float hotP = 0.40*g1 + 0.26*g0 + F.z;
+
+  /* spiral density waves (logarithmic, slow pattern speeds) */
+  float w2 = sin(2.0*(phi - 0.0385*t) - 3.55*lr);
+  float w3 = sin(3.0*(phi - 0.0215*t) - 6.10*lr + 1.7);
+  float amp = smoothstep(uRIn, uRIn+3.2, r);
+  dens *= 1.0 + amp*(0.215*w2 + 0.135*w3);
+
+  /* orbiting energetic knots */
+  float spot = 0.0;
+  for(int i=0;i<4;i++){
+    float fi = float(i);
+    float u  = t/86.0 + fi*0.4137;
+    vec3  hh = hash33(vec3(floor(u), fi, 3.7));
+    float rr = uRIn + 0.35 + hh.x*hh.x*10.0;
+    float ag = fract(u)*86.0;
+    float pp = hh.y*TAU + omega(rr)*ag;
+    float dp = mod(phi - pp + PI, TAU) - PI;
+    float dl = lr - log(rr);
+    float sz = 0.075 + 0.075*hh.z;
+    float en = sin(PI*fract(u)); en = en*en;
+    spot += en*exp(-(dl*dl)/(sz*sz) - (dp*dp)/(sz*sz*46.0));
+  }
+  dens *= 1.0 + spot*1.15;
+
+  float hot = clamp(0.26 + 0.66*rid + hotP + spot*0.85, 0.0, 1.35);
+  return vec3(max(dens,0.0), hot, 0.0);
+}
+
+/* emission / extinction of the relativistic plasma at one point */
+void plasma(vec3 q, vec4 p, float rel, out vec3 emis, out float ext){
+  emis = vec3(0.0); ext = 0.0;
+  float a = uSpin, a2 = a*a;
+  float rho = dot(q,q) - a2;
+  float D  = sqrt(rho*rho + 4.0*a2*q.z*q.z);
+  float R2 = max(0.5*(rho + D), 1e-5);
+  float r  = sqrt(R2);
+  if(r > uROut*1.01 || r < uRH*1.04) return;
+
+  /* local circular-orbit four velocity (Kerr, prograde), in Kerr-Schild frame */
+  float S = R2 + a2;
+  vec3  k = vec3((r*q.x + a*q.y)/S, (r*q.y - a*q.x)/S, q.z/r);
+  float f = 2.0*R2*r/(R2*R2 + a2*q.z*q.z);
+  float om = omega(max(r, 2.05));
+  vec3  v3 = vec3(-om*q.y, om*q.x, 0.0);
+  float cc = dot(k, v3);
+  float N  = min(-1.0 + dot(v3,v3) + f*(1.0+cc)*(1.0+cc), -2e-3);
+  float pu = inversesqrt(-N)*(p.x + dot(p.yzw, v3));
+  float g  = clamp((p.x*uCamG)/min(pu,-1e-4), 0.06, 7.0);
+  float boost = pow(g, uBeam);
+
+  float phi = atan(q.y, q.x);
+  float H  = diskH(r);
+  float zn = (q.z - diskWarp(r, phi))/H;
+  if(abs(zn) > 2.55) return;
+  float ramp = edgeRamp(r);
+  if(ramp < 1e-3) return;
+
+  vec3 fld = diskField(r, phi, zn, rel);
+  float vp = exp(-0.95*zn*zn) + 0.016*exp(-1.25*abs(zn));
+  float dens = fld.x*vp*ramp;
+  if(dens < 8e-4) return;
+  float hot = fld.y;
+
+  float Te = tempProf(r)*(0.76 + 0.60*hot);
+  vec3  col = bb(Te*g);
+  float iH  = 0.717/H;
+  /* emissivity is super-linear in density (free-free / synchrotron like),
+     which keeps turbulent structure visible even where the flow is thick */
+  float je = dens*pow(dens + 0.055, 0.95)*2.10;
+  emis += col * (je*sbProf(r)*iH*(0.26 + 1.70*hot)*boost*uDiskGain);
+  ext  += dens*tauProf(r)*iH;
+}
+
+/* Hot, optically thin inner flow hugging the last stable orbit. Near-critical
+   photons wind through it several times, which is what builds the thin nested
+   photon-ring structure hugging the shadow. Smooth, so one sample per step. */
+vec3 innerGlow(vec3 q, vec4 p){
+  float a = uSpin, a2 = a*a;
+  float rho = dot(q,q) - a2;
+  float R2 = max(0.5*(rho + sqrt(rho*rho + 4.0*a2*q.z*q.z)), 1e-5);
+  float r  = sqrt(R2);
+  if(r > uRIn*3.1 || r < uRH*1.02) return vec3(0.0);
+  float hc = 1.85*diskH(r);
+  float zc = q.z/hc;
+  if(abs(zc) > 3.0) return vec3(0.0);
+  float rc = r/uRIn - 1.10;
+  float cw = exp(-3.7*rc*rc)*exp(-0.5*zc*zc);
+  cw *= smoothstep(uRH*1.02, uRH*1.62, r);
+  if(cw < 0.0025) return vec3(0.0);
+  float S = R2 + a2;
+  vec3  k = vec3((r*q.x + a*q.y)/S, (r*q.y - a*q.x)/S, q.z/r);
+  float f = 2.0*R2*r/(R2*R2 + a2*q.z*q.z);
+  float om = omega(max(r, 2.05));
+  vec3  v3 = vec3(-om*q.y, om*q.x, 0.0);
+  float cc = dot(k, v3);
+  float N  = min(-1.0 + dot(v3,v3) + f*(1.0+cc)*(1.0+cc), -2e-3);
+  float pu = inversesqrt(-N)*(p.x + dot(p.yzw, v3));
+  float g  = clamp((p.x*uCamG)/min(pu,-1e-4), 0.06, 7.0);
+  return bb(clamp(19500.0*g, 900.0, 38000.0))*(cw*uCorona*pow(g, uBeam));
+}
+
+/* =================== deep sky =================== */
+const mat3 GAL = mat3( 0.6431, -0.5100,  0.5714,
+                       0.7017,  0.6926, -0.1712,
+                      -0.3055,  0.5100,  0.8038);
+
+void cubeFace(vec3 d, out int f, out vec2 uv){
+  vec3 ad = abs(d);
+  if(ad.x >= ad.y && ad.x >= ad.z){ f = d.x>0.0?0:1; uv = vec2(d.y,d.z)/ad.x; }
+  else if(ad.y >= ad.z){           f = d.y>0.0?2:3; uv = vec2(d.x,d.z)/ad.y; }
+  else {                           f = d.z>0.0?4:5; uv = vec2(d.x,d.y)/ad.z; }
+}
+vec3 faceDir(int f, vec2 uv){
+  if(f==0) return vec3( 1.0, uv.x, uv.y);
+  if(f==1) return vec3(-1.0, uv.x, uv.y);
+  if(f==2) return vec3(uv.x,  1.0, uv.y);
+  if(f==3) return vec3(uv.x, -1.0, uv.y);
+  if(f==4) return vec3(uv.x, uv.y,  1.0);
+  return   vec3(uv.x, uv.y, -1.0);
+}
+
+/* smooth galactic light: unresolved stars + dust extinction */
+vec3 galacticLight(vec3 d, float lod, out float sdens){
+  vec3 g = GAL*d;
+  float lat = clamp(g.z, -1.0, 1.0);
+  vec4 c1 = nz(vec3(g*0.85) + vec3(0.31,0.77,0.19));
+  vec4 c2 = nz(vec3(g*2.40) + vec3(0.83,0.24,0.62));
+  vec4 c3 = uQual > 0 ? nz(vec3(g*7.10) + vec3(0.45,0.58,0.91)) : c2.yzwx;
+  vec4 c4 = uQual > 1 ? nz(vec3(g*19.0) + vec3(0.12,0.94,0.37)) : c3.wxyz;
+  float fine = lod;
+
+  float w = 0.105*(1.0 + 0.62*c1.x + 0.28*c2.y);
+  float core = exp(-pow(abs(lat)/w, 1.30));
+  float halo = exp(-pow(abs(lat)/(w*3.6), 1.70));
+  float band = core*(0.55 + 0.45*(0.5+0.5*c1.y)) + 0.26*halo;
+  float lon = atan(g.y, g.x);
+  float bul = exp(-7.0*(lat*lat) - 1.9*(lon*lon));
+
+  float haze = band*(0.62 + 0.52*c2.x + 0.32*c3.y*fine + 0.18*c4.x*fine*fine);
+  haze += bul*1.25;
+  haze = max(haze, 0.0);
+
+  /* diffuse cirrus far off the plane, extremely faint */
+  float cir = max(0.0, 0.5+0.5*c1.z)*exp(-abs(lat)*2.6)*(0.30+0.70*max(0.0,c2.z));
+
+  /* dust lanes */
+  float dl = 0.5 + 0.5*c2.w;
+  float dust = pow(max(0.0, dl*0.72 + 0.46*max(0.0,c3.x) - 0.26), 1.55);
+  dust *= core*1.7 + bul*1.1;
+  float ext = exp(-3.1*dust);
+
+  sdens = clamp(haze*0.95 + 0.11, 0.0, 2.6)*ext;
+
+  vec3 warm = bb(4350.0);
+  vec3 cool = bb(6600.0);
+  vec3 col = mix(cool, warm, clamp(0.22 + 1.5*dust, 0.0, 1.0));
+  vec3 r = col*(haze*0.0175*ext) + bb(4100.0)*(cir*0.0030);
+  /* faint HII emission inside the densest lanes */
+  float hii = pow(max(0.0,c3.z),3.0)*core*max(0.0,c2.x);
+  r += vec3(0.026,0.0055,0.0062)*hii;
+  /* deep-sky floor: never pure zero, still visually black */
+  r += vec3(0.00105,0.00112,0.00145);
+  return r;
+}
+
+vec3 starField(vec3 d, mat2 iC, float sqDet, float pixA, float sdens){
+  vec3 acc = vec3(0.0);
+  int f; vec2 uv; cubeFace(d, f, uv);
+  vec3 t1 = normalize(cross(d, abs(d.z)<0.9 ? vec3(0.0,0.0,1.0) : vec3(1.0,0.0,0.0)));
+  vec3 t2 = cross(d, t1);
+  /* stars carry a fixed angular flux, so a coarser internal resolution
+     spreads that flux out instead of multiplying it into blobs */
+  float kres = uRes.y*0.00105;
+  float base = 0.42*kres*kres/sqDet;
+  float occf = clamp(0.44 + 0.85*sdens, 0.33, 1.30);
+  float lumf = 0.62 + 0.60*sdens;
+  int nL = uQual > 0 ? 3 : 2;
+  for(int L=0; L<nL; L++){
+    float N    = L==0 ? 170.0 : (L==1 ? 41.0 : 11.0);
+    float prob = L==0 ? 0.62  : (L==1 ? 0.30 : 0.26);
+    float amp  = L==0 ? 0.0255: (L==1 ? 0.230: 2.60);
+    float sd   = float(L)*17.0 + float(f)*4.3;
+    vec2 gg = (uv*0.5+0.5)*N;
+    vec2 gi = floor(gg);
+    for(int j=-1;j<=1;j++){
+      for(int i=-1;i<=1;i++){
+        vec2 c = gi + vec2(float(i),float(j));
+        vec3 h = hash33(vec3(c, sd));
+        if(h.z > prob*occf) continue;
+        vec3 h2 = hash33(vec3(c.y, c.x, sd+91.7));
+        vec3 sdir = normalize(faceDir(f, ((c + h.xy)/N)*2.0 - 1.0));
+        vec2 dt = vec2(dot(sdir-d, t1), dot(sdir-d, t2));
+        float q = dot(dt, iC*dt);
+        if(q > 26.0) continue;
+        float xi = max(h2.x, 1e-4);
+        float bri = min(pow(xi, -0.74), 32.0);
+        float flux = bri*amp*lumf;
+        /* hotter stars are intrinsically brighter, as on the real sky */
+        float tp = h2.y*0.72 + 0.28*clamp((bri-1.0)*0.14, 0.0, 1.0);
+        float T = 3050.0 + 5900.0*pow(tp, 1.65);
+        if(h2.z > 0.984) T = 13000.0 + 15000.0*h2.x;
+        if(h2.z < 0.055) T = 2350.0 + 750.0*h2.y;
+        float prof = exp(-0.5*q) + 0.033*exp(-0.10*q);
+        acc += mix(bb(T), vec3(1.0), 0.38)*(flux*base*prof);
+      }
+    }
+  }
+  return acc;
+}
+
+vec3 galaxies(vec3 d, mat2 JJ, float pixA, float sdens){
+  vec3 acc = vec3(0.0);
+  int f; vec2 uv; cubeFace(d, f, uv);
+  vec3 t1 = normalize(cross(d, abs(d.z)<0.9 ? vec3(0.0,0.0,1.0) : vec3(1.0,0.0,0.0)));
+  vec3 t2 = cross(d, t1);
+  float obsc = clamp(1.25 - sdens*0.85, 0.10, 1.0);
+  const float N = 11.0;
+  vec2 gg = (uv*0.5+0.5)*N;
+  vec2 gi = floor(gg);
+  for(int j=-1;j<=1;j++){
+    for(int i=-1;i<=1;i++){
+      vec2 c = gi + vec2(float(i),float(j));
+      vec3 h = hash33(vec3(c, float(f)*7.31 + 5.0));
+      if(h.z > 0.16) continue;
+      vec3 h2 = hash33(vec3(c.y*1.7, c.x*2.3, float(f)+13.0));
+      vec3 sdir = normalize(faceDir(f, ((c + h.xy)/N)*2.0 - 1.0));
+      float A = (0.0009 + 0.0042*h2.x*h2.x);
+      float B = A*(0.22 + 0.72*h2.y);
+      float th = h2.z*PI;
+      float cs = cos(th), sn = sin(th);
+      mat2 R = mat2(vec2(cs,sn), vec2(-sn,cs));
+      mat2 Sg = R*mat2(vec2(A*A,0.0), vec2(0.0,B*B))*mat2(vec2(cs,-sn), vec2(sn,cs));
+      mat2 C = JJ + Sg;
+      float det = max(C[0][0]*C[1][1]-C[0][1]*C[1][0], 1e-24);
+      mat2 iC = mat2(vec2(C[1][1],-C[1][0]), vec2(-C[0][1],C[0][0]))/det;
+      vec2 dt = vec2(dot(sdir-d, t1), dot(sdir-d, t2));
+      float q = dot(dt, iC*dt);
+      if(q > 20.0) continue;
+      float lum = (0.9 + 5.5*h.x*h.x)*obsc;
+      float T = 3600.0 + 3400.0*h2.y;
+      vec2 e = vec2(dot(dt,R[0]), dot(dt,R[1]));
+      float rr = length(vec2(e.x/A, e.y/B)) + 1e-4;
+      float arm = 1.0 + 0.34*cos(2.0*atan(e.y/B, e.x/A) + 4.2*log(rr) + h2.z*9.0)*step(0.5,h2.x);
+      float prof = (exp(-0.5*q)*arm + 0.10*exp(-0.20*q));
+      acc += bb(T)*(lum*prof*(2.6e-7/sqrt(det)));
+    }
+  }
+  return acc;
+}
+
+vec3 skyLook(vec3 d, vec3 du, vec3 dv, float pixA){
+  float lmax = 70.0*pixA;
+  float l1 = length(du), l2 = length(dv);
+  if(l1 > lmax) du *= lmax/l1;
+  if(l2 > lmax) dv *= lmax/l2;
+  vec3 t1 = normalize(cross(d, abs(d.z)<0.9 ? vec3(0.0,0.0,1.0) : vec3(1.0,0.0,0.0)));
+  vec3 t2 = cross(d, t1);
+  mat2 J = mat2(vec2(dot(du,t1),dot(du,t2)), vec2(dot(dv,t1),dot(dv,t2)));
+  mat2 JJ = J*transpose(J);
+  float sg2 = 0.42;
+  JJ = mat2(JJ[0]*sg2, JJ[1]*sg2);
+  float th2 = pixA*pixA*0.014;
+  mat2 C = JJ + mat2(vec2(th2,0.0), vec2(0.0,th2));
+  float det = max(C[0][0]*C[1][1]-C[0][1]*C[1][0], 1e-26);
+  mat2 iC = mat2(vec2(C[1][1],-C[1][0]), vec2(-C[0][1],C[0][0]))/det;
+  float sqDet = sqrt(det)/(pixA*pixA);
+
+  float foot = max(sqrt(max(JJ[0][0]+JJ[1][1],0.0))/max(pixA,1e-9), 0.35);
+  float lod = clamp(1.35 - 0.55*log2(foot+1.0), 0.0, 1.0);
+
+  float sdens;
+  vec3 col = galacticLight(d, lod, sdens);
+  col += starField(d, iC, sqDet, pixA, sdens);
+  if(uQual > 0) col += galaxies(d, JJ, pixA, sdens);
+  return col*uSkyGain;
+}
+
+/* =================== main =================== */
+void main(){
+  vec2 pix = gl_FragCoord.xy + uJit;
+  vec2 uv  = (pix - 0.5*uRes)/uRes.y;
+  float pixA = 2.0*uTanHalf/uRes.y;
+  vec3 dir = normalize(uBasis*vec3(uv.x*2.0*uTanHalf, uv.y*2.0*uTanHalf, 1.0));
+
+  /* photon momentum arriving at the static camera (spatial direction -dir) */
+  vec3 q0 = uCam;
+  float a = uSpin, a2 = a*a;
+  float rho0 = dot(q0,q0) - a2;
+  float D0  = sqrt(rho0*rho0 + 4.0*a2*q0.z*q0.z);
+  float R20 = max(0.5*(rho0 + D0), 1e-5);
+  float r0  = sqrt(R20);
+  float S0  = R20 + a2;
+  vec3  k0  = vec3((r0*q0.x + a*q0.y)/S0, (r0*q0.y - a*q0.x)/S0, q0.z/r0);
+  float f0  = 2.0*R20*r0/(R20*R20 + a2*q0.z*q0.z);
+  vec3  sd  = -dir;
+  float cc0 = dot(k0, sd);
+  float v0t = (f0*cc0 + sqrt(max(1.0 - f0 + f0*cc0*cc0, 1e-6)))/max(1.0 - f0, 1e-4);
+  vec4 p = vec4((f0-1.0)*v0t + f0*cc0, sd + f0*k0*(v0t + cc0));
+  vec4 x = vec4(0.0, q0);
+
+  vec3  L  = vec3(0.0);
+  float Tr = 1.0;
+  float diskL = 0.0;
+  bool escaped = false;
+  int volN = 0;
+  float seed = fract(hash13(vec3(gl_FragCoord.xy, 7.31)) + uFrameJ*0.6180339887);
+
+  for(int i=0;i<uSteps;i++){
+    float r = ksRad(x.yzw);
+    if(r < uRH + 0.014) break;
+    if(r > uEscape){ escaped = true; break; }
+    float d = max(r - uRH, 0.02);
+    float h = min(0.024 + 0.116*d, (r > 13.0 ? 0.125 : 0.071)*r)*uStepK;
+
+    p *= inversesqrt(max(dot(p,p), 1e-12));
+    vec4 xs = x, ps = p, v0;
+    /* fourth order only where curvature is strong; second order elsewhere */
+    float rk4Lim = uQual == 0 ? 4.5 : (uQual == 1 ? 13.0 : 26.0);
+    if(r > rk4Lim) rk2(x, p, -h, v0); else rk4(x, p, -h, v0);
+
+    vec3 A = xs.yzw, Bp = x.yzw;
+    float rm = ksRad(0.5*(A+Bp));
+    if(rm < uROut*1.02 && rm > uRH){
+      float Hm = diskH(clamp(rm, uRIn, uROut));
+      float segLen0 = length(Bp-A);
+      if(rm < uRIn*3.1){
+        vec3 cg = innerGlow(0.5*(A+Bp), 0.5*(ps+p))*(segLen0*Tr);
+        L += cg; diskL += cg.x+cg.y+cg.z;
+      }
+      float zGate = 3.2*Hm + 0.0165*rm;
+      if((A.z*Bp.z) <= 0.0 || min(abs(A.z),abs(Bp.z)) < zGate){
+        vec3 c1 = (-h)*v0.yzw;
+        vec3 c2 = Bp - A - c1;
+        float segLen = segLen0;
+        /* progressively coarsen once the sample budget is being spent so that
+           grazing rays degrade smoothly instead of terminating in bands */
+        float fade = 1.0 + 5.0*float(volN)/float(uVolBudget);
+        float dsW = clamp(0.44*Hm*fade*uStepK, 0.030, 3.0);
+        int ns = int(min(ceil(segLen/dsW), 7.0));
+        float fns = float(ns);
+        float ds = segLen/fns;
+        for(int j=0;j<ns;j++){
+          float s = (float(j) + seed)/fns;
+          vec3 pos = A + s*c1 + (s*s)*c2;
+          vec4 pm = mix(ps, p, s);
+          float dc = length(pos - uCam);
+          /* The sampling footprint is the larger of the pixel cone width and the
+             march step. Out here ds is several times the cone width, so leaving
+             the step term out of the LOD lets the fine octaves alias into
+             per-pixel speckle instead of averaging. Pre-filtering along the ray
+             trades unresolvable detail for a correct mean, which reads as clean
+             structure rather than grain. */
+          float rel = max(pixA*dc, ds*LONGF)/max(ksRad(pos), 0.5);
+          vec3 em; float ex;
+          plasma(pos, pm, rel, em, ex);
+          if(ex > 0.0 || em.x+em.y+em.z > 0.0){
+            /* analytic constant-source slab: removes step-size bias in the
+               optically thick regions of the flow */
+            float tt = exp(-ex*ds);
+            float w  = (ex > 2e-4) ? (1.0-tt)/ex : ds;
+            vec3 contrib = em*(w*Tr);
+            L += contrib;
+            diskL += contrib.x+contrib.y+contrib.z;
+            Tr *= tt;
+          }
+        }
+        volN += ns;
+      }
+    }
+    if(Tr < 0.010) break;
+  }
+
+  vec4 dxE, dpE;
+  rhs(x, p, dxE, dpE);
+  vec3 sky = normalize(-dxE.yzw);
+  vec3 du = dFdx(sky), dv = dFdy(sky);
+
+  if(escaped && Tr > 0.010){
+    L += Tr*skyLook(sky, du, dv, pixA);
+  }
+  L = sane(L);
+  float tot = L.x+L.y+L.z;
+  oCol = vec4(L, clamp(diskL/max(tot,1e-6), 0.0, 1.0));
+}`;
+
+      /* ------------------------------------------------ temporal accumulation */
+      var FS_ACC = `#version 300 es
+precision highp float;
+out vec4 oCol;
+uniform sampler2D uCur;
+uniform sampler2D uHist;
+uniform vec2  uRes;
+uniform mat3  uBasis;
+uniform mat3  uPrevBasis;
+uniform float uTanHalf;
+uniform float uMotion;
+uniform float uAlphaK;
+uniform float uReset;
+
+vec3 tm(vec3 c){ return c/(1.0+c); }
+vec3 itm(vec3 c){ return c/max(1.0-c, 1e-3); }
+
+void main(){
+  vec2 pix = gl_FragCoord.xy;
+  vec2 tc  = pix/uRes;
+  vec4 cur = texture(uCur, tc);
+
+  vec2 uv = (pix - 0.5*uRes)/uRes.y;
+  vec3 d  = uBasis*vec3(uv.x*2.0*uTanHalf, uv.y*2.0*uTanHalf, 1.0);
+  vec3 lp = d*uPrevBasis;
+  float alpha = mix(0.095, 0.28, cur.a)*uAlphaK;
+  alpha = clamp(alpha + uMotion, 0.04, 1.0);
+
+  if(uReset < 0.5 && lp.z > 1e-4){
+    vec2 pu = vec2(lp.x/lp.z, lp.y/lp.z)/(2.0*uTanHalf);
+    vec2 pp = pu*uRes.y + 0.5*uRes;
+    if(all(greaterThan(pp, vec2(0.5))) && all(lessThan(pp, uRes-0.5))){
+      vec3 hs = texture(uHist, pp/uRes).rgb;
+      vec3 mn = vec3(1e9), mx = vec3(-1e9);
+      for(int j=-1;j<=1;j++){
+        for(int i=-1;i<=1;i++){
+          vec3 s = tm(texture(uCur, (pix+vec2(float(i),float(j)))/uRes).rgb);
+          mn = min(mn,s); mx = max(mx,s);
+        }
+      }
+      vec3 pad = (mx-mn)*0.28 + vec3(0.006);
+      vec3 hc = itm(clamp(tm(hs), mn-pad, mx+pad));
+      oCol = vec4(mix(hc, cur.rgb, alpha), cur.a);
+      return;
+    }
+  }
+  oCol = vec4(cur.rgb, cur.a);
+}`;
+
+      /* ------------------------------------------------------------- bloom */
+      var FS_DOWN = `#version 300 es
+precision highp float;
+out vec4 oCol;
+uniform sampler2D uT;
+uniform vec2 uTexel;
+uniform float uKaris;
+vec3 fetch(vec2 p){ return min(texture(uT,p).rgb, vec3(120.0)); }
+float kw(vec3 c){ return 1.0/(1.0 + max(max(c.r,c.g),c.b)); }
+void main(){
+  vec2 uv = gl_FragCoord.xy*uTexel*2.0;
+  vec2 t = uTexel;
+  vec3 a=fetch(uv+vec2(-2,-2)*t), b=fetch(uv+vec2(0,-2)*t), c=fetch(uv+vec2(2,-2)*t);
+  vec3 d=fetch(uv+vec2(-2, 0)*t), e=fetch(uv), f=fetch(uv+vec2(2, 0)*t);
+  vec3 g=fetch(uv+vec2(-2, 2)*t), h=fetch(uv+vec2(0, 2)*t), i=fetch(uv+vec2(2, 2)*t);
+  vec3 j=fetch(uv+vec2(-1,-1)*t), k=fetch(uv+vec2(1,-1)*t);
+  vec3 l=fetch(uv+vec2(-1, 1)*t), m=fetch(uv+vec2(1, 1)*t);
+  if(uKaris > 0.5){
+    vec3 g0=(j+k+l+m)*0.25, g1=(a+b+d+e)*0.25, g2=(b+c+e+f)*0.25, g3=(d+e+g+h)*0.25, g4=(e+f+h+i)*0.25;
+    float w0=kw(g0),w1=kw(g1),w2=kw(g2),w3=kw(g3),w4=kw(g4);
+    float ws=w0*0.5+(w1+w2+w3+w4)*0.125;
+    oCol=vec4((g0*w0*0.5+(g1*w1+g2*w2+g3*w3+g4*w4)*0.125)/max(ws,1e-5),1.0);
+  } else {
+    vec3 o = e*0.125 + (a+c+g+i)*0.03125 + (b+d+f+h)*0.0625 + (j+k+l+m)*0.125;
+    oCol = vec4(o, 1.0);
+  }
+}`;
+
+      var FS_UP = `#version 300 es
+precision highp float;
+out vec4 oCol;
+uniform sampler2D uT;
+uniform sampler2D uAdd;
+uniform vec2 uTexel;
+uniform float uRad;
+void main(){
+  vec2 uv = gl_FragCoord.xy*uTexel;
+  vec2 t = uTexel*uRad;
+  vec3 s = texture(uT,uv+vec2(-1,-1)*t).rgb + texture(uT,uv+vec2(0,-1)*t).rgb*2.0 + texture(uT,uv+vec2(1,-1)*t).rgb
+         + texture(uT,uv+vec2(-1, 0)*t).rgb*2.0 + texture(uT,uv).rgb*4.0 + texture(uT,uv+vec2(1,0)*t).rgb*2.0
+         + texture(uT,uv+vec2(-1, 1)*t).rgb + texture(uT,uv+vec2(0, 1)*t).rgb*2.0 + texture(uT,uv+vec2(1,1)*t).rgb;
+  oCol = vec4(s*0.0625 + texture(uAdd,uv).rgb, 1.0);
+}`;
+
+      /* ---------------------------------------------------- final grade / output */
+      /* Contrast limited sharpening applied at the traced resolution, which costs a
+         fraction of doing a wide reconstruction filter at display resolution.
+         Clamping to the local extremes keeps it free of ringing halos. */
+      var FS_SHARP = `#version 300 es
+precision highp float;
+out vec4 oCol;
+uniform sampler2D uT;
+uniform vec2 uTexel;
+uniform float uAmt;
+void main(){
+  vec2 uv = gl_FragCoord.xy*uTexel;
+  vec4 c = texture(uT, uv);
+  /* Diagonal taps placed off the texel grid so each one is a bilinear average
+     of four neighbours. That puts the peak of the boost well below Nyquist:
+     a tap ring at +-1 texel would amplify single pixel speckle hardest, which
+     is the one thing in this image that must not be amplified. */
+  vec2 o = uTexel*1.4;
+  vec3 a = texture(uT, uv + vec2(-o.x,-o.y)).rgb;
+  vec3 b = texture(uT, uv + vec2( o.x,-o.y)).rgb;
+  vec3 d = texture(uT, uv + vec2(-o.x, o.y)).rgb;
+  vec3 e = texture(uT, uv + vec2( o.x, o.y)).rgb;
+  vec3 sur = (a+b+d+e)*0.25;
+  vec3 lo = min(min(min(a,b),min(d,e)), c.rgb);
+  vec3 hi = max(max(max(a,b),max(d,e)), c.rgb);
+  vec3 r = c.rgb + (c.rgb - sur)*uAmt;
+  oCol = vec4(clamp(r, lo, hi), c.a);
+}`;
+
+      var FS_AVG = `#version 300 es
+precision highp float;
+out vec4 oCol;
+uniform sampler2D uT;
+void main(){
+  vec3 s = vec3(0.0);
+  for(int j=0;j<4;j++)
+    for(int i=0;i<4;i++)
+      s += min(texture(uT, (vec2(float(i),float(j))+0.5)*0.25).rgb, vec3(40.0));
+  oCol = vec4(s*0.0625, 1.0);
+}`;
+
+      var FS_OUT = `#version 300 es
+precision highp float;
+out vec4 oCol;
+uniform sampler2D uHDR;
+uniform sampler2D uBloom;
+uniform sampler2D uAvg;
+uniform vec2  uRes;
+uniform vec2  uScale;
+uniform vec2  uSrc;
+uniform float uSharp;
+uniform float uExp;
+uniform float uTarget;
+uniform float uBloomStr;
+uniform float uBloomNorm;
+uniform float uVig;
+
+const mat3 AGX_IN = mat3(
+  0.8566271533, 0.0951212405, 0.0482516061,
+  0.1373189729, 0.7612419906, 0.1014390364,
+  0.1118982129, 0.0767994186, 0.8113023683);
+const mat3 AGX_OUT = mat3(
+   1.1271005818, -0.1106066431, -0.0164939387,
+  -0.1413297634,  1.1578237022, -0.0164939387,
+  -0.1413297634, -0.1106066431,  1.2519364065);
+
+vec3 agxCurve(vec3 x){
+  vec3 x2=x*x, x4=x2*x2;
+  return 15.5*x4*x2 - 40.14*x4*x + 31.96*x4 - 6.868*x2*x + 0.4298*x2 + 0.1191*x - 0.00232;
+}
+vec3 agx(vec3 c){
+  c = AGX_IN*max(c, 0.0);
+  c = clamp((log2(max(c,1e-10)) + 12.47393)*0.0606061, 0.0, 1.0);
+  c = agxCurve(c);
+  float l = dot(c, vec3(0.2126,0.7152,0.0722));
+  c = pow(max(c*vec3(1.0,0.995,0.988), 0.0), vec3(1.34));
+  c = l + 1.075*(c - l);
+  c = AGX_OUT*c;
+  return pow(max(c,0.0), vec3(2.2));
+}
+vec3 srgb(vec3 c){
+  c = clamp(c, 0.0, 1.0);
+  return mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4)) - 0.055, step(0.0031308, c));
+}
+void main(){
+  vec2 uv = gl_FragCoord.xy/uRes*uScale;
+  vec3 c = texture(uHDR, uv).rgb;
+  vec3 b = texture(uBloom, uv).rgb*uBloomNorm;
+  c = mix(c, b, uBloomStr);
+  /* gentle photographic exposure adaptation: keeps deep blacks and highlight
+     detail intact from wide contextual framings down to close inspection */
+  float avg = dot(texture(uAvg, vec2(0.5)).rgb, vec3(0.2126,0.7152,0.0722));
+  float ev  = clamp(pow(uTarget/max(avg, 1e-5), 0.45), 0.52, 2.45);
+  vec2 p = gl_FragCoord.xy/uRes*2.0 - 1.0;
+  c *= uExp*ev*(1.0 - uVig*dot(p,p)*0.25);
+  c = agx(c);
+  c = srgb(c);
+  float dn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898,78.233)))*43758.5453);
+  float dn2 = fract(sin(dot(gl_FragCoord.xy, vec2(63.7264,10.873)))*32126.7231);
+  c += (dn + dn2 - 1.0)*0.0022;
+  oCol = vec4(c, 1.0);
+}`;
+
+      /* ------------------------------------------------------- GL plumbing */
+      function sh(type, src) {
+        var s = gl.createShader(type);
+        gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        return s;
+      }
+      function prog(fs) {
+        var p = gl.createProgram();
+        gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
+        gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+        var u = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+        for (var i = 0; i < n; i++) { var nm = gl.getActiveUniform(p, i).name; u[nm] = gl.getUniformLocation(p, nm); }
+        return { p: p, u: u };
+      }
+      var P_MAIN, P_ACC, P_DOWN, P_UP, P_OUT, P_AVG, P_SHARP;
+      try {
+        P_MAIN = prog(FS_MAIN); P_ACC = prog(FS_ACC);
+        P_DOWN = prog(FS_DOWN); P_UP = prog(FS_UP);
+        P_AVG = prog(FS_AVG); P_OUT = prog(FS_OUT);
+        P_SHARP = prog(FS_SHARP);
+      } catch (e) { return; }
+
+      var vao = gl.createVertexArray();
+      function draw() { gl.bindVertexArray(vao); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+
+      function tex2d(w, h, fmt, type, filt) {
+        var t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texImage2D(gl.TEXTURE_2D, 0, fmt, w, h, 0, gl.RGBA, type, null);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return t;
+      }
+      function fbo(t) {
+        var f = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+        return f;
+      }
+
+      /* ------------------------------------------- procedural volume noise */
+      function perlinTile(size, freq, seed) {
+        var n = freq * freq * freq;
+        var gx = new Float32Array(n), gy = new Float32Array(n), gz = new Float32Array(n);
+        var s = ((seed * 2654435761) >>> 0) | 1;
+        function rnd() { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }
+        for (var i = 0; i < n; i++) {
+          var x, y, z, l;
+          do { x = rnd() * 2 - 1; y = rnd() * 2 - 1; z = rnd() * 2 - 1; l = x * x + y * y + z * z; } while (l > 1.0 || l < 1e-4);
+          l = 1 / Math.sqrt(l); gx[i] = x * l; gy[i] = y * l; gz[i] = z * l;
+        }
+        var out = new Float32Array(size * size * size), sc = freq / size, idx = 0, f2 = freq * freq;
+        for (var k = 0; k < size; k++) {
+          var pz = k * sc, kz = pz | 0, tz = pz - kz, wz = tz * tz * tz * (tz * (tz * 6 - 15) + 10), tz1 = tz - 1;
+          var z0 = (kz % freq) * f2, z1 = ((kz + 1) % freq) * f2;
+          for (var j = 0; j < size; j++) {
+            var py = j * sc, ky = py | 0, ty = py - ky, wy = ty * ty * ty * (ty * (ty * 6 - 15) + 10), ty1 = ty - 1;
+            var y0 = (ky % freq) * freq, y1 = ((ky + 1) % freq) * freq;
+            var a00 = z0 + y0, a10 = z0 + y1, a01 = z1 + y0, a11 = z1 + y1;
+            for (var i2 = 0; i2 < size; i2++) {
+              var px = i2 * sc, kx = px | 0, tx = px - kx, wx = tx * tx * tx * (tx * (tx * 6 - 15) + 10), tx1 = tx - 1;
+              var x0 = kx % freq, x1 = (kx + 1) % freq;
+              var q0 = a00 + x0, q1 = a00 + x1, q2 = a10 + x0, q3 = a10 + x1, q4 = a01 + x0, q5 = a01 + x1, q6 = a11 + x0, q7 = a11 + x1;
+              var n0 = gx[q0] * tx + gy[q0] * ty + gz[q0] * tz, n1 = gx[q1] * tx1 + gy[q1] * ty + gz[q1] * tz;
+              var n2 = gx[q2] * tx + gy[q2] * ty1 + gz[q2] * tz, n3 = gx[q3] * tx1 + gy[q3] * ty1 + gz[q3] * tz;
+              var n4 = gx[q4] * tx + gy[q4] * ty + gz[q4] * tz1, n5 = gx[q5] * tx1 + gy[q5] * ty + gz[q5] * tz1;
+              var n6 = gx[q6] * tx + gy[q6] * ty1 + gz[q6] * tz1, n7 = gx[q7] * tx1 + gy[q7] * ty1 + gz[q7] * tz1;
+              var A = n0 + wx * (n1 - n0), B = n2 + wx * (n3 - n2), C = n4 + wx * (n5 - n4), D = n6 + wx * (n7 - n6);
+              var E = A + wy * (B - A), F = C + wy * (D - C);
+              out[idx++] = E + wz * (F - E);
+            }
+          }
+        }
+        var sum = 0; for (var t = 0; t < out.length; t++) sum += out[t] * out[t];
+        var inv = 1 / (2.15 * Math.sqrt(sum / out.length) + 1e-9);
+        for (var t2 = 0; t2 < out.length; t2++) out[t2] *= inv;
+        return out;
+      }
+      var NSZ = 48;
+      var noiseTex = (function () {
+        var chans = [perlinTile(NSZ, 4, 17), perlinTile(NSZ, 4, 193), perlinTile(NSZ, 4, 733), perlinTile(NSZ, 4, 2411)];
+        /* 8 bit storage halves the sampling cost of the volume texture, which is the
+           dominant bandwidth term on integrated GPUs; the residual quantisation is
+           far below the dither floor once the octaves are summed */
+        var m = NSZ * NSZ * NSZ, data = new Uint8Array(m * 4);
+        for (var i = 0; i < m; i++) {
+          for (var c = 0; c < 4; c++) {
+            var v = chans[c][i] * 0.5 + 0.5;
+            data[i * 4 + c] = v <= 0 ? 0 : (v >= 1 ? 255 : (v * 255 + 0.5) | 0);
+          }
+        }
+        var t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_3D, t);
+        gl.texImage3D(gl.TEXTURE_3D, 0, gl.RGBA8, NSZ, NSZ, NSZ, 0, gl.RGBA, gl.UNSIGNED_BYTE, data);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+        gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.REPEAT);
+        return t;
+      })();
+
+      /* --------------------------------------- Planckian colour lookup table */
+      var bbTex = (function () {
+        function gp(x, m, s1, s2) { var t = (x - m) * (x < m ? 1 / s1 : 1 / s2); return Math.exp(-0.5 * t * t); }
+        var N = 256, data = new Float32Array(N * 4);
+        var lo = Math.log(900.0), hi = Math.log(38000.0);
+        for (var i = 0; i < N; i++) {
+          var T = Math.exp(lo + (hi - lo) * (i / (N - 1)));
+          var X = 0, Y = 0, Z = 0;
+          for (var l = 380; l <= 782; l += 4) {
+            var lm = l * 1e-9;
+            var B = 3.7418e-16 / (Math.pow(lm, 5) * (Math.exp(1.4388e-2 / (lm * T)) - 1));
+            X += B * (1.056 * gp(l, 599.8, 37.9, 31.0) + 0.362 * gp(l, 442.0, 16.0, 26.7) - 0.065 * gp(l, 501.1, 20.4, 26.2));
+            Y += B * (0.821 * gp(l, 568.8, 46.9, 40.5) + 0.286 * gp(l, 530.9, 16.3, 31.1));
+            Z += B * (1.217 * gp(l, 437.0, 11.8, 36.0) + 0.681 * gp(l, 459.0, 26.0, 13.8));
+          }
+          var R = 3.2406 * X - 1.5372 * Y - 0.4986 * Z;
+          var G = -0.9689 * X + 1.8758 * Y + 0.0415 * Z;
+          var Bl = 0.0557 * X - 0.2040 * Y + 1.0570 * Z;
+          R = Math.max(R, 0); G = Math.max(G, 0); Bl = Math.max(Bl, 0);
+          var lum = 0.2126 * R + 0.7152 * G + 0.0722 * Bl;
+          if (lum <= 0) lum = 1;
+          data[i * 4] = R / lum; data[i * 4 + 1] = G / lum; data[i * 4 + 2] = Bl / lum; data[i * 4 + 3] = 1;
+        }
+        var t = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, t);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, N, 1, 0, gl.RGBA, gl.FLOAT, data);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        return t;
+      })();
+
+      /* --------------------------------------------------- render targets */
+      var RT = { w: 0, h: 0, fw: 0, fh: 0, levels: 0 };
+      function releaseRT() {
+        if (!RT.hdrT) return;
+        var kill = [RT.hdrT, RT.h0T, RT.h1T, RT.avT, RT.shT].concat(RT.dT || [], RT.uT || []);
+        for (var i = 0; i < kill.length; i++) if (kill[i]) gl.deleteTexture(kill[i]);
+        var kf = [RT.hdrF, RT.h0F, RT.h1F, RT.avF, RT.shF].concat(RT.dF || [], RT.uF || []);
+        for (var j = 0; j < kf.length; j++) if (kf[j]) gl.deleteFramebuffer(kf[j]);
+      }
+      function allocRT(w, h, fw, fh) {
+        releaseRT();
+        RT = { w: w, h: h, fw: fw, fh: fh, dT: [], dF: [], uT: [], uF: [], dw: [], dh: [] };
+        RT.hdrT = tex2d(w, h, HDRFMT, HDRTYPE, gl.LINEAR); RT.hdrF = fbo(RT.hdrT);
+        RT.h0T = tex2d(w, h, HDRFMT, HDRTYPE, gl.LINEAR); RT.h0F = fbo(RT.h0T);
+        RT.h1T = tex2d(w, h, HDRFMT, HDRTYPE, gl.LINEAR); RT.h1F = fbo(RT.h1T);
+        RT.avT = tex2d(1, 1, HDRFMT, HDRTYPE, gl.LINEAR); RT.avF = fbo(RT.avT);
+        RT.shT = tex2d(w, h, HDRFMT, HDRTYPE, gl.LINEAR); RT.shF = fbo(RT.shT);
+        var L = 0, cw = w, ch = h;
+        while (L < 7) {
+          cw = Math.max(1, cw >> 1); ch = Math.max(1, ch >> 1);
+          if (cw < 4 || ch < 4) break;
+          RT.dT[L] = tex2d(cw, ch, HDRFMT, HDRTYPE, gl.LINEAR); RT.dF[L] = fbo(RT.dT[L]);
+          RT.uT[L] = tex2d(cw, ch, HDRFMT, HDRTYPE, gl.LINEAR); RT.uF[L] = fbo(RT.uT[L]);
+          RT.dw[L] = cw; RT.dh[L] = ch;
+          L++;
+        }
+        RT.levels = L;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        for (var q = 0; q < 2; q++) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, q ? RT.h1F : RT.h0F);
+          gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      }
+
+      /* --------------------------------------------------------- camera */
+      var DEG = Math.PI / 180;
+      var lost = false;
+      var cam = {
+        az: 2.05, el: 5.5 * DEG, dist: 40.0,
+        azT: 2.05, elT: 5.5 * DEG, distT: 40.0,
+        azV: 0, elV: 0, drag: false, px: 0, py: 0, last: -1e9, idle0: 0, elBase: 5.5 * DEG, idling: false
+      };
+      function minEl(d) {
+        if (d > R_OUT * 1.03) return 0.0;
+        var H = 0.0335 * d + 0.105 * Math.exp(-(d - R_IN) * 0.45) + 0.00042 * d * d;
+        return Math.asin(Math.min(0.5, 2.9 * H / d));
+      }
+      canvas.addEventListener("pointerdown", function (e) {
+        cam.drag = true; cam.px = e.clientX; cam.py = e.clientY;
+        cam.last = performance.now(); cam.azV = 0; cam.elV = 0;
+        try { canvas.setPointerCapture(e.pointerId); } catch (_) { }
+      });
+      canvas.addEventListener("pointermove", function (e) {
+        if (!cam.drag) return;
+        var dx = e.clientX - cam.px, dy = e.clientY - cam.py;
+        cam.px = e.clientX; cam.py = e.clientY;
+        var s = 0.0031 * Math.min(1.0, 0.45 + cam.dist / 60.0);
+        cam.azT -= dx * s; cam.elT += dy * s * 0.82;
+        cam.elT = Math.max(-86 * DEG, Math.min(86 * DEG, cam.elT));
+        cam.azV = -dx * s * 3.2; cam.elV = dy * s * 0.82 * 3.2;
+        cam.last = performance.now();
+      });
+      function endDrag() { cam.drag = false; cam.last = performance.now(); }
+      canvas.addEventListener("pointerup", endDrag);
+      canvas.addEventListener("pointercancel", endDrag);
+      canvas.addEventListener("wheel", function (e) {
+        e.preventDefault();
+        var k = Math.exp(Math.max(-2.2, Math.min(2.2, e.deltaY * 0.0016)));
+        cam.distT = Math.max(3.9, Math.min(360.0, cam.distT * k));
+        cam.last = performance.now();
+      }, { passive: false });
+      canvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
+      canvas.addEventListener("webglcontextlost", function (e) { e.preventDefault(); lost = true; });
+      canvas.addEventListener("webglcontextrestored", function () { location.reload(); });
+      window.addEventListener("dragstart", function (e) { e.preventDefault(); });
+      window.addEventListener("keydown", function (e) {
+        if (e.key === " " || e.key === "PageUp" || e.key === "PageDown") e.preventDefault();
+      });
+
+      /* --------------------------------------------------- adaptive quality */
+      var SCALES = [0.34, 0.40, 0.47, 0.55, 0.64, 0.75, 0.87, 1.0];
+      var QSTEPS = [108, 120, 134, 152, 176, 206, 238, 272];
+      var QVOL = [32, 38, 46, 56, 68, 86, 102, 118];
+      var QSTEPK = [1.95, 1.76, 1.56, 1.38, 1.22, 1.10, 1.0, 1.0];
+      var QUAL = [0, 0, 0, 1, 1, 2, 2, 2];
+      var qIdx = 1, qw = 1, qHold = 8, qCeil = SCALES.length - 1, dragLow = false;
+
+      function resize() {
+        var cw = Math.max(2, canvas.clientWidth | 0), chh = Math.max(2, canvas.clientHeight | 0);
+        var dpr = Math.min(window.devicePixelRatio || 1, 2);
+        var W = Math.round(cw * dpr), H = Math.round(chh * dpr);
+        var budget = 3.2e6;
+        if (W * H > budget) { var k = Math.sqrt(budget / (W * H)); W = Math.round(W * k); H = Math.round(H * k); }
+        W = Math.max(2, W); H = Math.max(2, H);
+        var s = SCALES[qw];
+        /* present at native resolution: a single sharp reconstruction step looks far
+           better than stacking two interpolations */
+        if (canvas.width !== W || canvas.height !== H) { canvas.width = W; canvas.height = H; resetAcc = 1; }
+        if (pxW !== W || pxH !== H) { pxW = W; pxH = H; qCeil = SCALES.length - 1; qHold = 40; }
+        var rw = Math.max(2, Math.round(W * s)), rh = Math.max(2, Math.round(H * s));
+        if (RT.w !== rw || RT.h !== rh) { allocRT(rw, rh, W, H); resetAcc = 1; }
+      }
+      var pxW = 0, pxH = 0;
+      window.addEventListener("resize", function () { qHold = 60; });
+
+      /* --------------------------------------------------------- main loop */
+      /* Simulation time per wall second. A hole of this mass has orbital periods of
+         days, so this is a time lapse rate and free to choose: at 4.0 the pattern
+         sweeps round in about 37 s while the innermost flow takes about 7 s, which
+         reads clearly as rotation. The shear is bounded by the generation scheme, so
+         raising this no longer trades against the flow winding up into rings. */
+      var TSCALE = 4.0;
+      var simT = 0, frame = 0, resetAcc = 1, histIdx = 0;
+      var lastNow = performance.now(), dtEMA = 16.7;
+      var basis = new Float32Array(9), pBasis = new Float32Array(9);
+      var camPos = [0, 0, 0], prevFwd = [0, 0, 1], prevDist = cam.dist, revealed = false;
+      var HAL2 = [0.5, 0.25, 0.75, 0.125, 0.625, 0.375, 0.875, 0.0625, 0.5625, 0.3125, 0.8125, 0.1875, 0.6875, 0.4375, 0.9375, 0.03125];
+      var HAL3 = [0.3333, 0.6667, 0.1111, 0.4444, 0.7778, 0.2222, 0.5556, 0.8889, 0.0370, 0.3704, 0.7037, 0.1481, 0.4815, 0.8148, 0.2593, 0.5926];
+
+      function norm3(v) { var l = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; }
+      function cross3(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+
+      function tick(now) {
+        requestAnimationFrame(tick);
+        if (lost) return;
+        var dtR = Math.min(0.05, Math.max(0.0005, (now - lastNow) * 0.001));
+        lastNow = now;
+        dtEMA += (Math.min(80, (dtR * 1000)) - dtEMA) * 0.06;
+        simT += dtR * TSCALE;
+
+        /* -------- quality controller -------- */
+        /* Wall clock driven quality search. It probes upward once, and the moment a
+           tier fails it is remembered as a ceiling, so the level settles quickly and
+           never oscillates. GPU timer queries are deliberately not used: several
+           integrated drivers report them inaccurately. */
+        if (qHold > 0) qHold--;
+        else if (dtEMA > 43.0 && qIdx > 0) {
+          qIdx -= (dtEMA > 90.0 ? 3 : (dtEMA > 60.0 ? 2 : 1));
+          if (qIdx < 0) qIdx = 0;
+          qCeil = qIdx; qHold = 45;
+        } else if (dtEMA < 20.5 && qIdx < qCeil) { qIdx++; qHold = 55; }
+
+        /* drop two tiers while the camera is being driven, so the control stays
+           responsive, then restore shortly after the pointer is released */
+        if (cam.drag) dragLow = true;
+        else if (dragLow && now > cam.last + 260) dragLow = false;
+        qw = dragLow ? Math.max(0, qIdx - 2) : qIdx;
+        resize();
+        if (!RT.hdrT) return;
+
+        /* -------- camera integration -------- */
+        var idle = (now - cam.last) > 3200;
+        if (!cam.idling && idle) { cam.idling = true; cam.idle0 = now; cam.elBase = cam.elT; }
+        if (!idle) cam.idling = false;
+        if (!cam.drag) {
+          cam.azT += cam.azV * dtR; cam.elT += cam.elV * dtR;
+          var dec = Math.exp(-dtR / 0.42);
+          cam.azV *= dec; cam.elV *= dec;
+          cam.elT = Math.max(-86 * DEG, Math.min(86 * DEG, cam.elT));
+        }
+        if (cam.idling) {
+          var ramp = Math.min(1.0, (now - cam.idle0 - 200) / 2600);
+          if (ramp > 0) {
+            cam.azT += 0.0135 * ramp * dtR;
+            var ph = (now - cam.idle0) * 0.001;
+            cam.elT = cam.elBase + 3.1 * DEG * ramp * Math.sin(ph * 0.052);
+          }
+        }
+        var kS = 1.0 - Math.exp(-dtR / 0.155);
+        cam.az += (cam.azT - cam.az) * kS;
+        cam.el += (cam.elT - cam.el) * kS;
+        cam.dist += (cam.distT - cam.dist) * (1.0 - Math.exp(-dtR / 0.30));
+        var me = minEl(cam.dist);
+        if (Math.abs(cam.el) < me) cam.el = (cam.el < 0 ? -me : me);
+
+        var ce = Math.cos(cam.el), se = Math.sin(cam.el);
+        camPos = [cam.dist * ce * Math.cos(cam.az), cam.dist * ce * Math.sin(cam.az), cam.dist * se];
+        var fwd = norm3([-camPos[0], -camPos[1], -camPos[2]]);
+        var upRef = (Math.abs(fwd[2]) > 0.995) ? [1, 0, 0] : [0, 0, 1];
+        var right = norm3(cross3(upRef, fwd));
+        var up = cross3(fwd, right);
+        pBasis.set(basis);
+        basis[0] = right[0]; basis[1] = right[1]; basis[2] = right[2];
+        basis[3] = up[0]; basis[4] = up[1]; basis[5] = up[2];
+        basis[6] = fwd[0]; basis[7] = fwd[1]; basis[8] = fwd[2];
+
+        var dotF = Math.max(-1, Math.min(1, fwd[0] * prevFwd[0] + fwd[1] * prevFwd[1] + fwd[2] * prevFwd[2]));
+        var motion = Math.acos(dotF) * 3.6 + Math.abs(cam.dist - prevDist) / cam.dist * 9.0;
+        motion = Math.min(0.80, motion);
+        prevFwd = fwd; prevDist = cam.dist;
+        if (frame < 2) resetAcc = 1;
+
+        /* -------- uniforms -------- */
+        var a2 = SPIN * SPIN;
+        var qq = camPos[0] * camPos[0] + camPos[1] * camPos[1] + camPos[2] * camPos[2];
+        var rhoC = qq - a2;
+        var Dc = Math.sqrt(rhoC * rhoC + 4 * a2 * camPos[2] * camPos[2]);
+        var R2c = 0.5 * (rhoC + Dc), rC = Math.sqrt(R2c);
+        var fC = 2 * R2c * rC / (R2c * R2c + a2 * camPos[2] * camPos[2]);
+        var camG = 1 / Math.sqrt(Math.max(0.02, 1 - fC));
+        /* keep a cinematic horizontal field of view on narrow or tall windows */
+        var TANH = Math.tan(TUNE.fov * 0.5 * DEG);
+        TANH = Math.min(0.50, Math.max(TANH, TANH * 1.78 * canvas.height / canvas.width));
+        var ji = frame & 15;
+        var jx = HAL2[ji] - 0.5, jy = HAL3[ji] - 0.5;
+
+        /* -------- geodesic pass -------- */
+        gl.bindFramebuffer(gl.FRAMEBUFFER, RT.hdrF);
+        gl.viewport(0, 0, RT.w, RT.h);
+        gl.useProgram(P_MAIN.p);
+        var U = P_MAIN.u;
+        gl.uniform2f(U.uRes, RT.w, RT.h);
+        gl.uniform2f(U.uJit, jx, jy);
+        gl.uniform1f(U.uTime, simT);
+        gl.uniform3f(U.uCam, camPos[0], camPos[1], camPos[2]);
+        gl.uniformMatrix3fv(U.uBasis, false, basis);
+        gl.uniform1f(U.uTanHalf, TANH);
+        gl.uniform1f(U.uSpin, SPIN);
+        gl.uniform1i(U.uSteps, QSTEPS[qw]);
+        gl.uniform1i(U.uQual, QUAL[qw]);
+        gl.uniform1f(U.uStepK, QSTEPK[qw]);
+        gl.uniform1f(U.uEscape, Math.max(82.0, cam.dist * 1.75));
+        gl.uniform1f(U.uCamG, camG);
+        gl.uniform1f(U.uFrameJ, frame % 4096);
+        gl.uniform1f(U.uRIn, R_IN);
+        gl.uniform1f(U.uRH, R_H);
+        gl.uniform1f(U.uROut, R_OUT);
+        gl.uniform1f(U.uNtMax, NT_MAX);
+        gl.uniform1f(U.uTPeak, TUNE.tPeak);
+        gl.uniform1f(U.uBeam, TUNE.beam);
+        gl.uniform1f(U.uDiskGain, TUNE.diskGain);
+        gl.uniform1f(U.uCorona, TUNE.corona);
+        gl.uniform1f(U.uSkyGain, TUNE.skyGain);
+        gl.uniform1i(U.uVolBudget, QVOL[qw]);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_3D, noiseTex);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, bbTex);
+        gl.uniform1i(U.uNoise, 0); gl.uniform1i(U.uBB, 1);
+        draw();
+
+        /* -------- temporal resolve -------- */
+        var dst = histIdx, src = 1 - histIdx;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, dst ? RT.h1F : RT.h0F);
+        gl.viewport(0, 0, RT.w, RT.h);
+        gl.useProgram(P_ACC.p);
+        var A = P_ACC.u;
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, RT.hdrT);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, src ? RT.h1T : RT.h0T);
+        gl.uniform1i(A.uCur, 0); gl.uniform1i(A.uHist, 1);
+        gl.uniform2f(A.uRes, RT.w, RT.h);
+        gl.uniformMatrix3fv(A.uBasis, false, basis);
+        gl.uniformMatrix3fv(A.uPrevBasis, false, pBasis);
+        gl.uniform1f(A.uTanHalf, TANH);
+        gl.uniform1f(A.uMotion, motion);
+        /* coarser sampling needs a longer temporal average to stay clean */
+        /* Coarser sampling needs a longer temporal average to stay clean. Rotation is
+           driven by TSCALE, not by shortening this window: the neighbourhood clamp
+           below already discards history the moving flow has invalidated, so a long
+           window costs tangential softening along the filaments and nothing more. */
+        gl.uniform1f(A.uAlphaK, QUAL[qw] === 0 ? 0.58 : (QUAL[qw] === 1 ? 0.80 : 1.0));
+        gl.uniform1f(A.uReset, resetAcc);
+        draw();
+        var resolved = dst ? RT.h1T : RT.h0T;
+        histIdx = src;
+        resetAcc = 0;
+
+        /* -------- bloom -------- */
+        var L = RT.levels;
+        gl.useProgram(P_DOWN.p);
+        gl.activeTexture(gl.TEXTURE0);
+        for (var i = 0; i < L; i++) {
+          var sw = i === 0 ? RT.w : RT.dw[i - 1], shh = i === 0 ? RT.h : RT.dh[i - 1];
+          gl.bindFramebuffer(gl.FRAMEBUFFER, RT.dF[i]);
+          gl.viewport(0, 0, RT.dw[i], RT.dh[i]);
+          gl.bindTexture(gl.TEXTURE_2D, i === 0 ? resolved : RT.dT[i - 1]);
+          gl.uniform1i(P_DOWN.u.uT, 0);
+          gl.uniform2f(P_DOWN.u.uTexel, 1 / sw, 1 / shh);
+          gl.uniform1f(P_DOWN.u.uKaris, i === 0 ? 1.0 : 0.0);
+          draw();
+        }
+        gl.bindFramebuffer(gl.FRAMEBUFFER, RT.avF);
+        gl.viewport(0, 0, 1, 1);
+        gl.useProgram(P_AVG.p);
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, RT.dT[L - 1]);
+        gl.uniform1i(P_AVG.u.uT, 0);
+        draw();
+
+        gl.useProgram(P_UP.p);
+        for (var i2 = L - 1; i2 >= 0; i2--) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, RT.uF[i2]);
+          gl.viewport(0, 0, RT.dw[i2], RT.dh[i2]);
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, i2 === L - 1 ? RT.dT[i2] : RT.uT[i2 + 1]);
+          gl.activeTexture(gl.TEXTURE1);
+          gl.bindTexture(gl.TEXTURE_2D, i2 === L - 1 ? RT.dT[i2] : RT.dT[i2]);
+          gl.uniform1i(P_UP.u.uT, 0); gl.uniform1i(P_UP.u.uAdd, 1);
+          gl.uniform2f(P_UP.u.uTexel, 1 / RT.dw[i2], 1 / RT.dh[i2]);
+          gl.uniform1f(P_UP.u.uRad, i2 === L - 1 ? 0.0 : 1.55);
+          draw();
+        }
+
+        /* -------- detail recovery at trace resolution -------- */
+        var present = resolved;
+        var upFac = canvas.width / Math.max(1, RT.w);
+        if (upFac > 1.05) {
+          gl.bindFramebuffer(gl.FRAMEBUFFER, RT.shF);
+          gl.viewport(0, 0, RT.w, RT.h);
+          gl.useProgram(P_SHARP.p);
+          gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, resolved);
+          gl.uniform1i(P_SHARP.u.uT, 0);
+          gl.uniform2f(P_SHARP.u.uTexel, 1 / RT.w, 1 / RT.h);
+          gl.uniform1f(P_SHARP.u.uAmt, Math.min(0.70, 0.26 * (upFac - 1.0) + 0.22));
+          draw();
+          present = RT.shT;
+        }
+
+        /* -------- grade and present -------- */
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.useProgram(P_OUT.p);
+        gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, present);
+        gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, RT.uT[0]);
+        gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, RT.avT);
+        gl.uniform1i(P_OUT.u.uHDR, 0); gl.uniform1i(P_OUT.u.uBloom, 1); gl.uniform1i(P_OUT.u.uAvg, 2);
+        gl.uniform1f(P_OUT.u.uTarget, TUNE.evTarget);
+        gl.uniform2f(P_OUT.u.uRes, canvas.width, canvas.height);
+        gl.uniform2f(P_OUT.u.uScale, 1.0, 1.0);
+        gl.uniform2f(P_OUT.u.uSrc, RT.w, RT.h);
+        gl.uniform1f(P_OUT.u.uSharp, 0.0);
+        gl.uniform1f(P_OUT.u.uExp, TUNE.exposure);
+        gl.uniform1f(P_OUT.u.uBloomStr, TUNE.bloom);
+        gl.uniform1f(P_OUT.u.uBloomNorm, 1.0 / Math.max(1, RT.levels));
+        gl.uniform1f(P_OUT.u.uVig, TUNE.vignette);
+        draw();
+
+        frame++;
+        if (!revealed && frame > 3) { revealed = true; canvas.style.opacity = "1"; }
+      }
+      requestAnimationFrame(tick);
+
+    })();
+  </script>
+</body>
+
+</html>
